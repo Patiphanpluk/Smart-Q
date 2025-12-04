@@ -166,9 +166,9 @@
             const [audioEnabled, setAudioEnabled] = useState(false);
             
             // New States for Features
-            const [queuePrefix, setQueuePrefix] = useState(() => localStorage.getItem('queue_prefix') || 'A');
+            const [queuePrefix, setQueuePrefix] = useState('A'); // ค่าเริ่มต้น A แต่จะรอโหลดจาก DB
             const [showSettings, setShowSettings] = useState(false);
-            const [showHistory, setShowHistory] = useState(null); // 'completed' or 'cancelled' or null
+            const [showHistory, setShowHistory] = useState(null); 
             
             const lastAnnouncedMyQueueRef = useRef(null);
             const lastAnnouncedDisplayRef = useRef(null);
@@ -208,21 +208,38 @@
                 }
             }, []);
 
-            // Data Sync
+            // Data Sync & Settings Sync
             useEffect(() => {
                 if (!services?.db || !user) return; 
+                
+                // 1. Queue Sync
                 let collectionRef = (typeof __app_id !== 'undefined') 
                     ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('queues')
                     : services.db.collection('queues');
 
-                const unsub = collectionRef.onSnapshot(snapshot => {
+                const unsubQueues = collectionRef.onSnapshot(snapshot => {
                     const loaded = [];
                     snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
                     loaded.sort((a, b) => a.createdAt - b.createdAt);
                     setQueues(loaded);
                     setLoading(false);
                 }, err => { if (err.code !== 'permission-denied') console.error(err); setLoading(false); });
-                return () => unsub();
+
+                // 2. Settings Sync (ดึงการตั้งค่าแบบ Realtime)
+                let settingsRef = (typeof __app_id !== 'undefined')
+                    ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main')
+                    : services.db.collection('settings').doc('main');
+
+                const unsubSettings = settingsRef.onSnapshot(doc => {
+                    if (doc.exists && doc.data().queuePrefix) {
+                        setQueuePrefix(doc.data().queuePrefix);
+                    }
+                }, err => console.log("Settings sync skipped (might not exist yet)"));
+
+                return () => {
+                    unsubQueues();
+                    unsubSettings();
+                };
             }, [services, user]); 
 
             // Notification Logic
@@ -264,8 +281,6 @@
                 setIsSubmitting(true);
                 try { if ('Notification' in window) Notification.requestPermission(); } catch (e) {}
 
-                // Count queues for TODAY (Simulated by filtering current list) to run numbers 001, 002
-                // We use the current list to find the max number of the SAME prefix
                 const prefixQueues = queues.filter(q => q.number.startsWith(queuePrefix));
                 const maxNum = prefixQueues.reduce((max, q) => {
                     const parts = q.number.split('-');
@@ -311,8 +326,6 @@
                 if (!user) return;
                 try {
                     const batch = services.db.batch();
-                    // Firestore client SDK doesn't support delete collection easily, we loop.
-                    // Limit to batch size 500. For this app it's fine.
                     let collectionRef = (typeof __app_id !== 'undefined')
                         ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('queues')
                         : services.db.collection('queues');
@@ -326,14 +339,23 @@
                 } catch (err) { alert("Error clearing: " + err.message); }
             };
 
-            const handleSaveSettings = () => {
-                localStorage.setItem('queue_prefix', queuePrefix);
-                setShowSettings(false);
+            const handleSaveSettings = async () => {
+                if (!user || !services) return;
+                try {
+                    let docRef = (typeof __app_id !== 'undefined')
+                        ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main')
+                        : services.db.collection('settings').doc('main');
+                    
+                    await docRef.set({ queuePrefix: queuePrefix }, { merge: true });
+                    setShowSettings(false);
+                } catch (err) {
+                    alert("บันทึกการตั้งค่าไม่สำเร็จ: " + err.message);
+                }
             };
 
             const handleRecall = (id) => {
                 updateStatus(id, 'serving');
-                setShowHistory(null); // Close modal
+                setShowHistory(null);
             };
 
             const openKioskLink = () => {
