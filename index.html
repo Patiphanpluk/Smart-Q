@@ -32,7 +32,7 @@
         const { useState, useEffect, useRef } = React;
         
         // ==========================================
-        // 1. ตั้งค่า FIREBASE ของคุณ (ใส่ให้แล้วครับ)
+        // 1. ตั้งค่า FIREBASE ของคุณ
         // ==========================================
         const YOUR_FIREBASE_CONFIG = {
             apiKey: "AIzaSyA5DOlMXP9IedzosXcFls3kvbvdKyQGjGk",
@@ -48,12 +48,9 @@
 
         const initFirebase = () => {
             let config;
-            
-            // ใช้ Auto Config หากรันใน Environment นี้ (เพื่อการทดสอบ)
             if (typeof __firebase_config !== 'undefined') {
                 config = JSON.parse(__firebase_config);
             } else {
-                // ใช้ Config ของคุณ หากรันข้างนอก
                 config = YOUR_FIREBASE_CONFIG;
             }
 
@@ -89,17 +86,25 @@
         };
 
         // --- Setup Error Component ---
-        const SetupError = () => (
+        const SetupError = ({ errorMsg }) => (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
                 <div className="bg-white max-w-lg w-full rounded-2xl shadow-xl p-8 text-center border-t-4 border-red-500">
                     <div className="flex justify-center mb-4 text-red-500"><Icons.Alert size={64}/></div>
                     <h1 className="text-2xl font-bold text-slate-800 mb-2">เกิดข้อผิดพลาดในการเชื่อมต่อ</h1>
-                    <p className="text-slate-600 mb-6">
-                        ไม่สามารถเชื่อมต่อกับ Firebase ได้ กรุณาตรวจสอบการตั้งค่า Firestore Database Rules ใน Firebase Console
+                    <p className="text-slate-600 mb-6 font-mono text-sm bg-slate-100 p-2 rounded break-all">
+                        {errorMsg || "ไม่สามารถเชื่อมต่อกับ Firebase ได้"}
                     </p>
-                    <div className="bg-slate-100 rounded-xl p-4 text-left text-sm text-slate-700 font-mono overflow-x-auto mb-6">
-                        เคล็ดลับ: ตรวจสอบว่าเปิดใช้งาน Firestore แล้ว<br/>
-                        และ Rules อนุญาตให้อ่าน/เขียน (read, write: if true;)
+                    <div className="text-left text-sm text-slate-700 bg-orange-50 p-4 rounded-xl border border-orange-100">
+                        <p className="font-bold mb-2">วิธีแก้ไขเบื้องต้น:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                            <li>ไปที่ <b>Firebase Console</b> > <b>Authentication</b> > <b>Sign-in method</b> แล้วเปิดใช้งาน <b>Anonymous</b></li>
+                            <li>ไปที่ <b>Firestore Database</b> > <b>Rules</b> และตรวจสอบว่าอนุญาตให้อ่านเขียนได้ (เช่น <code>allow read, write: if true;</code> สำหรับทดสอบ)</li>
+                        </ul>
+                    </div>
+                    <div className="mt-6">
+                        <a href="https://console.firebase.google.com/" target="_blank" className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors">
+                            ไปที่ Firebase Console
+                        </a>
                     </div>
                 </div>
             </div>
@@ -115,6 +120,7 @@
             const [services, setServices] = useState(null);
             const [user, setUser] = useState(null); 
             const [configError, setConfigError] = useState(false);
+            const [errorMsg, setErrorMsg] = useState('');
             
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-queue-app';
 
@@ -129,11 +135,18 @@
                         if (u) {
                             setUser(u); 
                         } else {
-                            // If no user, sign in
-                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                await auth.signInWithCustomToken(__initial_auth_token);
-                            } else {
-                                await auth.signInAnonymously();
+                            try {
+                                // Attempt to sign in
+                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                    await auth.signInWithCustomToken(__initial_auth_token);
+                                } else {
+                                    await auth.signInAnonymously();
+                                }
+                            } catch (authErr) {
+                                console.error("Auth Error:", authErr);
+                                setErrorMsg("Authentication Failed: " + authErr.message);
+                                setConfigError(true);
+                                setLoading(false);
                             }
                         }
                     });
@@ -146,7 +159,8 @@
 
                     return () => unsubAuth();
                 } catch (err) {
-                    console.error(err);
+                    console.error("Init Error:", err);
+                    setErrorMsg("Init Failed: " + err.message);
                     setConfigError(true);
                     setLoading(false);
                 }
@@ -156,33 +170,31 @@
             useEffect(() => {
                 if (!services?.db || !user) return; 
                 
-                // Subscribe to Firestore Data
-                // ถ้าใช้ Environment ของระบบนี้ให้ใช้ path เดิม แต่ถ้าใช้เองข้างนอกใช้ collection root
-                
                 let collectionRef;
                 if (typeof __app_id !== 'undefined') {
-                     // Running in Chat Environment (Demo Mode)
                      collectionRef = services.db.collection('artifacts').doc(appId)
                             .collection('public').doc('data')
                             .collection('queues');
                 } else {
-                     // Running on GitHub / Localhost (Real Mode)
-                     // ใช้ collection 'queues' ที่ root เลยเพื่อความง่าย
                      collectionRef = services.db.collection('queues');
                 }
 
                 const unsub = collectionRef.onSnapshot(snapshot => {
                     const loaded = [];
                     snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
-                    // Sort by createdAt
                     loaded.sort((a, b) => a.createdAt - b.createdAt);
                     setQueues(loaded);
                     setLoading(false);
                 }, err => {
-                    // Ignore permission errors initially (wait for auth)
-                    if (err.code !== 'permission-denied') {
-                        console.error("Sync error:", err);
+                    console.error("Sync error:", err);
+                    if (err.code === 'permission-denied') {
+                        setErrorMsg("Permission Denied: ตรวจสอบ Firestore Rules");
+                    } else {
+                        setErrorMsg("Sync Error: " + err.message);
                     }
+                    // Stop loading anyway so we can show the error
+                    setLoading(false);
+                    setConfigError(true);
                 });
 
                 return () => unsub();
@@ -239,7 +251,6 @@
                     }
 
                     const ref = await collectionRef.add(newQueue);
-                    
                     localStorage.setItem('my_queue_id', ref.id);
                     setMyQueueId(ref.id);
                     setCustomerName('');
@@ -279,7 +290,7 @@
             const currentServing = queues.find(q => q.status === 'serving');
             const myQueue = queues.find(q => q.id === myQueueId);
 
-            if (configError) return <SetupError />;
+            if (configError) return <SetupError errorMsg={errorMsg} />;
             if (loading) return <div className="h-screen flex items-center justify-center text-slate-400">กำลังเชื่อมต่อระบบ...</div>;
 
             // --- KIOSK MODE ---
