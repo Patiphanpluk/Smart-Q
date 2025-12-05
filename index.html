@@ -93,7 +93,7 @@
             Loader: (p) => <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>,
             Settings: (p) => (
                 <svg xmlns="http://www.w3.org/2000/svg" width={p.size || 24} height={p.size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}>
-                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2 0l-.45.45a2 2 0 0 0 0 2l.08.18a2 2 0 0 1 0 2l-.25.43a2 2 0 0 1-1.73 1l-.18.08a2 2 0 0 0 0 2v.44a2 2 0 0 0 2 2h.18a2 2 0 0 1 1.73 1l.25.43a2 2 0 0 1 0 2l.08.18a2 2 0 0 0 2 0l.45-.45a2 2 0 0 0 0-2l.18-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V4a2 2 0 0 0-2-2z" />
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2 0l-.45.45a2 2 0 0 0 0 2l.08.18a2 2 0 0 1 0 2l-.25.43a2 2 0 0 1-1.73 1l-.18.08a2 2 0 0 0 0 2v.44a2 2 0 0 0 2 2h.18a2 2 0 0 1 1.73 1l.25.43a2 2 0 0 1 0 2l.08.18a2 2 0 0 0 2 0l.45-.45a2 2 0 0 0 0-2l.18-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73v.18a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.18.08a2 2 0 0 0 2 0l.45-.45a2 2 0 0 0 0-2l-.08-.18a2 2 0 0 1 0-2l.25-.43a2 2 0 0 1 1.73-1l.18-.08a2 2 0 0 0 0-2v-.44a2 2 0 0 0-2-2h-.18a2 2 0 0 1-1.73-1l-.25-.43a2 2 0 0 1 0-2l-.08-.18a2 2 0 0 0-2 0l-.45.45a2 2 0 0 0 0 2l-.18.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
                     <circle cx="12" cy="12" r="3" />
                 </svg>
             ),
@@ -286,7 +286,7 @@
                         
                         // Kiosk Mode: Play Beep + TTS
                         if (viewMode === 'kiosk') {
-                            playNotificationSound(); // Play Beep
+                            playNotificationSound(); // Play Beep for Customer only
                             setTimeout(() => {
                                 announceQueue(myQ.number, myQ.name); // Play TTS after beep
                             }, 500);
@@ -307,7 +307,7 @@
                     const isNewCall = !lastPlayed || lastPlayed.id !== currentServing.id || lastPlayed.calledAt !== currentServing.calledAt;
 
                     if (isNewCall) {
-                        playNotificationSound(); // Play Beep
+                        // Display Mode: TTS Only (No Beep)
                         setTimeout(() => announceQueue(currentServing.number, currentServing.name), 500);
                         lastAnnouncedDisplayRef.current = { id: currentServing.id, calledAt: currentServing.calledAt };
                     }
@@ -316,7 +316,7 @@
 
             const enableAudio = () => {
                 const audio = new Audio('');
-                audio.play().then(() => { setAudioEnabled(true); playNotificationSound(); }).catch(() => setAudioEnabled(true));
+                audio.play().then(() => { setAudioEnabled(true); if (viewMode === 'kiosk') playNotificationSound(); announceQueue("A-000", "ทดสอบ"); }).catch(() => setAudioEnabled(true));
             };
 
             const handleBookQueue = async (e) => {
