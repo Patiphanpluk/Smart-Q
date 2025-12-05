@@ -98,12 +98,12 @@
                 </svg>
             ),
             Trash: (p) => <Icon d="M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" {...p} />,
-            History: (p) => <Icon d="M3 3v5h5 M3.05 13A9 9 0 1 0 6 5.3L3 8" {...p} />
+            History: (p) => <Icon d="M3 3v5h5 M3.05 13A9 9 0 1 0 6 5.3L3 8" {...p} />,
+            ScreenLock: (p) => <Icon d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" {...p} /> // Mock icon for wake lock status
         };
 
-        // --- Sound Helper: Play Beep Sound (Fixed with cleanup) ---
+        // --- Sound Helper: Play Beep Sound ---
         const playNotificationSound = () => {
-            // สั่น (Android Only, iOS web doesn't support vibrate)
             if ("vibrate" in navigator) {
                 try { navigator.vibrate([200, 100, 200]); } catch(e){}
             }
@@ -111,42 +111,35 @@
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (!AudioContext) return;
             
-            // Create context
             const ctx = new AudioContext();
-            
             const beep = (startTime, freq) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-                
                 osc.frequency.setValueAtTime(freq, startTime);
                 gain.gain.setValueAtTime(0.1, startTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
-                
                 osc.start(startTime);
                 osc.stop(startTime + 0.1);
             };
 
             const now = ctx.currentTime;
-            // ติ๊ด-ติ๊ด-ติ๊ด
             beep(now, 800);
             beep(now + 0.15, 800);
             beep(now + 0.3, 800);
 
-            // Important: Close context after sound finishes to free up resources
-            setTimeout(() => {
-                if(ctx.state !== 'closed') ctx.close();
-            }, 1000);
+            setTimeout(() => { if(ctx.state !== 'closed') ctx.close(); }, 1000);
         };
 
-        // --- TTS Helper ---
+        // --- TTS Helper (Updated Pattern) ---
         const announceQueue = (queueNumber, customerName) => {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
 
+                // Format: "เอ ศูนย์ ศูนย์ หนึ่ง"
                 const parts = queueNumber.split('-');
-                let spokenText = "ขอเชิญหมายเลข ";
+                let spokenText = "";
                 
                 if (parts[0]) {
                     if (parts[0] === 'A') spokenText += "เอ ";
@@ -169,11 +162,8 @@
                     }
                 }
 
-                if (customerName) {
-                    spokenText += " คุณ" + customerName + " ";
-                }
-
-                spokenText += "เข้ารับบริการ";
+                // ต่อด้วย "ถึงคิวคุณแล้ว" (ตามที่ขอ)
+                spokenText += " ถึงคิวคุณแล้ว";
 
                 const utterance = new SpeechSynthesisUtterance(spokenText);
                 utterance.lang = 'th-TH';
@@ -181,6 +171,31 @@
                 utterance.volume = 1;
                 window.speechSynthesis.speak(utterance);
             }
+        };
+
+        // --- Wake Lock Hook (สำคัญมาก!) ---
+        const useWakeLock = () => {
+            const wakeLockRef = useRef(null);
+
+            const requestWakeLock = async () => {
+                if ('wakeLock' in navigator) {
+                    try {
+                        wakeLockRef.current = await navigator.wakeLock.request('screen');
+                        console.log('Wake Lock active');
+                    } catch (err) {
+                        console.error('Wake Lock failed:', err);
+                    }
+                }
+            };
+
+            useEffect(() => {
+                // Request on mount (if possible, but usually needs user gesture first)
+                return () => {
+                    if (wakeLockRef.current) wakeLockRef.current.release();
+                };
+            }, []);
+
+            return requestWakeLock;
         };
 
         const SetupError = ({ errorMsg }) => (
@@ -214,6 +229,7 @@
             const lastAnnouncedMyQueueRef = useRef(null);
             const lastAnnouncedDisplayRef = useRef(null);
             
+            const requestWakeLock = useWakeLock(); // Hook for screen awake
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-queue-app';
 
             useEffect(() => {
@@ -285,7 +301,6 @@
                 const myQ = queues.find(q => q.id === myQueueId);
                 
                 if (myQ && myQ.status === 'serving') {
-                    // Check timestamp to handle RECALL
                     const lastPlayed = lastAnnouncedMyQueueRef.current;
                     const isNewCall = !lastPlayed || lastPlayed.id !== myQ.id || lastPlayed.calledAt !== myQ.calledAt;
 
@@ -298,9 +313,9 @@
                         
                         // Kiosk Mode: Play Beep + TTS
                         if (viewMode === 'kiosk') {
-                            playNotificationSound(); // Play Beep for Customer only
+                            playNotificationSound(); 
                             setTimeout(() => {
-                                announceQueue(myQ.number, myQ.name); // Play TTS after beep
+                                announceQueue(myQ.number, myQ.name); 
                             }, 500);
                         }
                         
@@ -319,7 +334,7 @@
                     const isNewCall = !lastPlayed || lastPlayed.id !== currentServing.id || lastPlayed.calledAt !== currentServing.calledAt;
 
                     if (isNewCall) {
-                        // Display Mode: TTS Only (No Beep)
+                        // Display Mode: TTS Only (No Beep, or as preferred)
                         setTimeout(() => announceQueue(currentServing.number, currentServing.name), 500);
                         lastAnnouncedDisplayRef.current = { id: currentServing.id, calledAt: currentServing.calledAt };
                     }
@@ -337,14 +352,17 @@
                 setIsSubmitting(true);
                 try { if ('Notification' in window) Notification.requestPermission(); } catch (e) {}
 
-                // Unlock Audio for Mobile (Important!)
+                // Request Wake Lock
+                requestWakeLock();
+
+                // Unlock Audio context
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (AudioContext) {
                     try {
                         const ctx = new AudioContext();
                         const osc = ctx.createOscillator();
                         const gain = ctx.createGain();
-                        gain.gain.value = 0; // Silent
+                        gain.gain.value = 0; 
                         osc.connect(gain);
                         gain.connect(ctx.destination);
                         osc.start(0);
@@ -513,7 +531,12 @@
                                         </div>
                                     </div>
 
-                                    {myQueue.status === 'serving' && <div className="text-green-600 font-bold animate-bounce-slow">เชิญเข้ารับบริการค่ะ</div>}
+                                    {myQueue.status === 'serving' && (
+                                        <div className="bg-green-50 border border-green-200 p-4 rounded-xl text-green-800 text-sm text-left animate-bounce-slow">
+                                            <p className="font-bold text-lg mb-1">📢 ถึงคิวคุณแล้ว!</p>
+                                            <p>เชิญเข้ารับบริการค่ะ (กรุณาเปิดหน้าจอนี้ค้างไว้เพื่อรับเสียงแจ้งเตือน)</p>
+                                        </div>
+                                    )}
                                     <button onClick={() => {localStorage.removeItem('my_queue_id'); setMyQueueId(null);}} className="text-slate-400 text-sm hover:text-slate-600 underline">จองคิวใหม่ / ออกจากหน้านี้</button>
                                 </div>
                             </div>
