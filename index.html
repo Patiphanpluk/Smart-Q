@@ -135,7 +135,7 @@
         };
 
         // --- TTS Helper: พูดสาย ---
-        // mode: 'display' = "ขอเชิญหมายเลข...", 'client' = "หมายเลข... ถึงคิวของคุณแล้ว"
+        // mode: 'display' = "ขอเชิญหมายเลข... คุณ... เข้ารับบริการ", 'client' = "หมายเลข... ถึงคิวของคุณแล้ว"
         const announceQueue = (queueNumber, customerName, mode = 'display') => {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel(); // หยุดเสียงเก่าก่อน
@@ -168,8 +168,11 @@
                 let spokenText = "";
                 
                 if (mode === 'display') {
-                    // รูปแบบสำหรับจอรวม: "ขอเชิญหมายเลข A 0 0 1 เข้ารับบริการ"
+                    // รูปแบบสำหรับจอรวม: "ขอเชิญหมายเลข A 0 0 1 คุณสมชาย เข้ารับบริการค่ะ"
                     spokenText = "ขอเชิญหมายเลข " + numberText;
+                    if (customerName) {
+                        spokenText += " คุณ" + customerName;
+                    }
                     spokenText += " เข้ารับบริการค่ะ"; 
                 } else {
                     // รูปแบบสำหรับลูกค้า: "หมายเลข A 0 0 1 ถึงคิวของคุณแล้ว"
