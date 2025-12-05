@@ -168,19 +168,19 @@
                 let spokenText = "";
                 
                 if (mode === 'display') {
-                    // รูปแบบสำหรับจอรวม: "ขอเชิญหมายเลข A 0 0 1 คุณสมชาย เข้ารับบริการค่ะ"
+                    // รูปแบบสำหรับจอรวม: "ขอเชิญหมายเลข A 0 0 1 คุณสมชาย เข้ารับบริการ" (ตัดค่ะออก)
                     spokenText = "ขอเชิญหมายเลข " + numberText;
                     if (customerName) {
                         spokenText += " คุณ" + customerName;
                     }
-                    spokenText += " เข้ารับบริการค่ะ"; 
+                    spokenText += " เข้ารับบริการ"; 
                 } else {
                     // รูปแบบสำหรับลูกค้า: "หมายเลข A 0 0 1 ถึงคิวของคุณแล้ว"
                     spokenText = "หมายเลข " + numberText;
                     if (customerName) {
                        // spokenText += " คุณ" + customerName;
                     }
-                    spokenText += " ถึงคิวของคุณแล้วค่ะ";
+                    spokenText += " ถึงคิวของคุณแล้ว";
                 }
 
                 const utterance = new SpeechSynthesisUtterance(spokenText);
@@ -575,6 +575,9 @@
                                         </div>
                                     </div>
                                     
+                                    <p className="text-xs text-slate-400 bg-yellow-50 p-2 rounded text-center">
+                                        ⚠️ กรุณาเปิดหน้าจอนี้ค้างไว้ เพื่อให้เสียงแจ้งเตือนทำงานเมื่อถึงคิว
+                                    </p>
 
                                     {myQueue.status === 'serving' && (
                                         <div className="text-green-600 font-bold animate-bounce-slow text-lg">
