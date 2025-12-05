@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Q-Master Queue System</title>
     
     <!-- React & ReactDOM -->
@@ -18,13 +18,16 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Sarabun', sans-serif; }
+        body { font-family: 'Sarabun', sans-serif; -webkit-tap-highlight-color: transparent; }
         .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
         .animate-bounce-slow { animation: bounce 2s infinite; }
         @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* ป้องกันการเด้งของหน้าจอใน iOS */
+        html, body { overscroll-behavior-y: none; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -88,12 +91,45 @@
             Link: (p) => <Icon d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6 M15 3h6v6 M10 14L21 3" {...p} />,
             Alert: (p) => <Icon d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01" {...p} />,
             Loader: (p) => <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>,
-            Settings: (p) => <Icon d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2 0l-.45.45a2 2 0 0 0 0 2l.08.18a2 2 0 0 1 0 2l-.25.43a2 2 0 0 1-1.73 1l-.18.08a2 2 0 0 0 0 2v.44a2 2 0 0 0 2 2h.18a2 2 0 0 1 1.73 1l.25.43a2 2 0 0 1 0 2l.08.18a2 2 0 0 0 2 0l.45-.45a2 2 0 0 0 0-2l.18-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73v.18a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.18.08a2 2 0 0 0 2 0l.45-.45a2 2 0 0 0 0-2l-.08-.18a2 2 0 0 1 0-2l.25-.43a2 2 0 0 1 1.73-1l.18-.08a2 2 0 0 0 0-2v-.44a2 2 0 0 0-2-2h-.18a2 2 0 0 1-1.73-1l-.25-.43a2 2 0 0 1 0-2l-.08-.18a2 2 0 0 0-2 0l-.45.45a2 2 0 0 0 0 2l-.18.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" {...p} />,
+            Settings: (p) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width={p.size || 24} height={p.size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}>
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2 0l-.45.45a2 2 0 0 0 0 2l.08.18a2 2 0 0 1 0 2l-.25.43a2 2 0 0 1-1.73 1l-.18.08a2 2 0 0 0 0 2v.44a2 2 0 0 0 2 2h.18a2 2 0 0 1 1.73 1l.25.43a2 2 0 0 1 0 2l.08.18a2 2 0 0 0 2 0l.45-.45a2 2 0 0 0 0-2l.18-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V4a2 2 0 0 0-2-2z" />
+                    <circle cx="12" cy="12" r="3" />
+                </svg>
+            ),
             Trash: (p) => <Icon d="M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" {...p} />,
             History: (p) => <Icon d="M3 3v5h5 M3.05 13A9 9 0 1 0 6 5.3L3 8" {...p} />
         };
 
-        // --- TTS Helper ---
+        // --- Sound Helper: Play Beep Sound ---
+        const playNotificationSound = () => {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            
+            const ctx = new AudioContext();
+            
+            const beep = (startTime, freq) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                osc.frequency.setValueAtTime(freq, startTime);
+                gain.gain.setValueAtTime(0.1, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
+                
+                osc.start(startTime);
+                osc.stop(startTime + 0.1);
+            };
+
+            const now = ctx.currentTime;
+            // ติ๊ด-ติ๊ด-ติ๊ด
+            beep(now, 800);
+            beep(now + 0.15, 800);
+            beep(now + 0.3, 800);
+        };
+
+        // --- TTS Helper (Improved Thai with Name) ---
         const announceQueue = (queueNumber, customerName) => {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
@@ -232,13 +268,12 @@
                 };
             }, [services, user]); 
 
-            // --- Updated Notification Logic (Checks for new call time) ---
+            // Notification Logic (Client Side)
             useEffect(() => {
                 if (!myQueueId || queues.length === 0) return;
                 const myQ = queues.find(q => q.id === myQueueId);
                 
                 if (myQ && myQ.status === 'serving') {
-                    // Check if it's a new call based on timestamp or ID
                     const lastPlayed = lastAnnouncedMyQueueRef.current;
                     const isNewCall = !lastPlayed || lastPlayed.id !== myQ.id || lastPlayed.calledAt !== myQ.calledAt;
 
@@ -248,14 +283,21 @@
                                  new Notification("ถึงคิวของคุณแล้ว!", { body: `หมายเลข ${myQ.number}`, icon: '' });
                             }
                         } catch (e) {}
-                        if (viewMode === 'kiosk') announceQueue(myQ.number, myQ.name);
+                        
+                        // Kiosk Mode: Play Beep + TTS
+                        if (viewMode === 'kiosk') {
+                            playNotificationSound(); // Play Beep
+                            setTimeout(() => {
+                                announceQueue(myQ.number, myQ.name); // Play TTS after beep
+                            }, 500);
+                        }
                         
                         lastAnnouncedMyQueueRef.current = { id: myQ.id, calledAt: myQ.calledAt };
                     }
                 }
             }, [queues, myQueueId, viewMode]);
 
-            // --- Updated Public Announcement Logic (Checks for new call time) ---
+            // Public Announcement Logic (Display Mode)
             useEffect(() => {
                 if (viewMode !== 'display' || queues.length === 0) return;
                 const currentServing = queues.find(q => q.status === 'serving');
@@ -265,6 +307,7 @@
                     const isNewCall = !lastPlayed || lastPlayed.id !== currentServing.id || lastPlayed.calledAt !== currentServing.calledAt;
 
                     if (isNewCall) {
+                        playNotificationSound(); // Play Beep
                         setTimeout(() => announceQueue(currentServing.number, currentServing.name), 500);
                         lastAnnouncedDisplayRef.current = { id: currentServing.id, calledAt: currentServing.calledAt };
                     }
@@ -273,7 +316,7 @@
 
             const enableAudio = () => {
                 const audio = new Audio('');
-                audio.play().then(() => { setAudioEnabled(true); announceQueue("A-000", "ทดสอบ"); }).catch(() => setAudioEnabled(true));
+                audio.play().then(() => { setAudioEnabled(true); playNotificationSound(); }).catch(() => setAudioEnabled(true));
             };
 
             const handleBookQueue = async (e) => {
@@ -320,7 +363,6 @@
                         : services.db.collection('queues').doc(id);
                     
                     const updateData = { status };
-                    // Update timestamp on serving to trigger announcement
                     if (status === 'serving') {
                         updateData.calledAt = Date.now();
                     }
@@ -329,7 +371,6 @@
                 } catch (err) { console.error(err); }
             };
 
-            // --- Updated Recall Handler ---
             const handleRecall = async (id) => {
                 if (!user) return;
                 try {
@@ -337,7 +378,6 @@
                         ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('queues').doc(id)
                         : services.db.collection('queues').doc(id);
                     
-                    // Force update calledAt to trigger effects
                     await docRef.update({ 
                         status: 'serving', 
                         calledAt: Date.now() 
@@ -419,7 +459,7 @@
                             <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative">
                                 <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
                                 <div className="p-8 text-center space-y-8">
-                                    <div><span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-bold tracking-wide">YOUR QUEUE</span><h1 className="text-7xl font-black text-slate-800 mt-4 tracking-tighter">{myQueue.number}</h1></div>
+                                    <div><span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-bold tracking-wide">YOUR QUEUE</span><h1 className="text-6xl sm:text-7xl font-black text-slate-800 mt-4 tracking-tighter">{myQueue.number}</h1></div>
                                     <div className={`inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold shadow-sm ${myQueue.status === 'waiting' ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600 animate-pulse'}`}>
                                         {myQueue.status === 'waiting' ? <><Icons.Clock size={20}/> กำลังรอเรียก...</> : <><Icons.Volume size={20}/> ถึงคิวคุณแล้ว!</>}
                                     </div>
@@ -456,23 +496,23 @@
 
             if (viewMode === 'display') {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-8 bg-slate-100">
-                        <div className="flex flex-col lg:flex-row gap-8 w-full max-w-[95vw] h-[85vh]">
-                            <div className="flex-1 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl shadow-2xl flex flex-col items-center justify-center text-white relative overflow-hidden p-8">
-                                {!audioEnabled && <button onClick={enableAudio} className="absolute top-4 right-4 bg-white/20 px-4 py-2 rounded-full text-sm flex gap-2 z-50"><Icons.Volume size={16}/> เปิดเสียง</button>}
+                    <div className="min-h-screen flex items-center justify-center p-4 lg:p-8 bg-slate-100">
+                        <div className="flex flex-col lg:flex-row gap-6 w-full max-w-[95vw] min-h-screen lg:h-[85vh] lg:min-h-0">
+                            <div className="flex-1 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl shadow-2xl flex flex-col items-center justify-center text-white relative overflow-hidden p-8 min-h-[50vh] lg:min-h-0">
+                                {!audioEnabled && <button onClick={enableAudio} className="absolute top-4 right-4 bg-white/20 px-4 py-2 rounded-full text-sm flex gap-2 z-50 hover:bg-white/30 transition-all"><Icons.Volume size={16}/> เปิดเสียง</button>}
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
                                 <h2 className="text-2xl font-medium opacity-80 mb-8 uppercase tracking-widest">Calling Queue</h2>
                                 {currentServing ? (
-                                    <div className="text-center animate-bounce-slow">
-                                        <div className="text-[12rem] font-black leading-none tracking-tighter drop-shadow-lg">{currentServing.number}</div>
-                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-12 py-6 rounded-full inline-block"><span className="text-4xl font-bold">คุณ {currentServing.name}</span></div>
-                                        <div className="mt-10 text-3xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
+                                    <div className="text-center animate-bounce-slow w-full">
+                                        <div className="text-8xl md:text-[10rem] lg:text-[12rem] font-black leading-none tracking-tighter drop-shadow-lg">{currentServing.number}</div>
+                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-12 py-6 rounded-full inline-block max-w-full"><span className="text-3xl md:text-4xl font-bold truncate block">{currentServing.name}</span></div>
+                                        <div className="mt-10 text-2xl md:text-3xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
                                     </div>
                                 ) : (
-                                    <div className="text-center opacity-40"><div className="text-9xl font-black">---</div><div className="text-2xl mt-4">Waiting...</div></div>
+                                    <div className="text-center opacity-40"><div className="text-8xl md:text-9xl font-black">---</div><div className="text-2xl mt-4">Waiting...</div></div>
                                 )}
                             </div>
-                            <div className="w-full lg:w-[35rem] bg-white rounded-3xl shadow-xl border border-slate-100 flex flex-col overflow-hidden">
+                            <div className="w-full lg:w-[35rem] bg-white rounded-3xl shadow-xl border border-slate-100 flex flex-col overflow-hidden h-[40vh] lg:h-auto">
                                 <div className="p-6 bg-slate-50 border-b border-slate-100 font-bold text-slate-600 flex items-center gap-2"><Icons.Clock size={20} className="text-indigo-500"/> Next Queue</div>
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
                                     {waitingQueues.slice(0, 7).map((q) => (
@@ -494,15 +534,15 @@
             return (
                 <div className="min-h-screen bg-slate-50 pb-10">
                     <div className="bg-white border-b border-slate-200 sticky top-0 z-50 px-4 py-3 shadow-sm">
-                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-                            <div className="flex items-center gap-2 font-bold text-xl text-indigo-900"><div className="bg-indigo-600 text-white w-8 h-8 rounded flex items-center justify-center">Q</div>Q-Master Admin</div>
+                        <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
+                            <div className="flex items-center gap-2 font-bold text-xl text-indigo-900"><div className="bg-indigo-600 text-white w-8 h-8 rounded flex items-center justify-center">Q</div><span className="hidden sm:inline">Q-Master Admin</span></div>
                             <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
                                 <button onClick={() => setViewMode('admin')} className={`px-4 py-1.5 rounded-md text-sm font-bold ${viewMode==='admin'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>Admin</button>
                                 <button onClick={() => setViewMode('display')} className={`px-4 py-1.5 rounded-md text-sm font-bold ${viewMode==='display'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>Display</button>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full"><Icons.Settings/></button>
-                                <button onClick={openKioskLink} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md"><Icons.Link size={16}/> Kiosk Link</button>
+                                <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full flex-shrink-0"><Icons.Settings/></button>
+                                <button onClick={openKioskLink} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md"><Icons.Link size={16}/> <span className="hidden sm:inline">Kiosk Link</span></button>
                             </div>
                         </div>
                     </div>
@@ -511,7 +551,7 @@
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2 space-y-6">
                                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                                    <div className="flex justify-between items-start mb-6">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                                         <h2 className="font-bold text-slate-800 flex items-center gap-2"><Icons.Monitor className="text-indigo-600"/> Calling</h2>
                                         <button onClick={handleClearQueues} className="text-xs text-red-400 hover:text-red-600 border border-red-200 px-3 py-1 rounded-full flex items-center gap-1"><Icons.Trash size={12}/> ล้างคิวทั้งหมด</button>
                                     </div>
@@ -523,10 +563,10 @@
                                                 <div className="text-5xl font-black text-slate-800 mt-1 mb-2">{currentServing.number}</div>
                                                 <div className="text-xl font-medium text-slate-600">คุณ {currentServing.name}</div>
                                             </div>
-                                            <div className="flex gap-3 w-full md:w-auto">
-                                                <button onClick={() => handleRecall(currentServing.id)} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-4 rounded-xl font-bold active:scale-95 transition-all"><Icons.Volume size={20}/> เรียกซ้ำ</button>
-                                                <button onClick={() => updateStatus(currentServing.id, 'completed')} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-green-500 text-white px-8 py-4 rounded-xl font-bold shadow-lg shadow-green-200 active:scale-95"><Icons.Check/> เสร็จสิ้น</button>
-                                                <button onClick={() => updateStatus(currentServing.id, 'cancelled')} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-red-200 text-red-500 px-6 py-4 rounded-xl font-bold active:scale-95"><Icons.Cross/> ยกเลิก</button>
+                                            <div className="flex flex-wrap gap-3 w-full md:w-auto">
+                                                <button onClick={() => handleRecall(currentServing.id)} className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-4 rounded-xl font-bold active:scale-95 transition-all"><Icons.Volume size={20}/> เรียกซ้ำ</button>
+                                                <button onClick={() => updateStatus(currentServing.id, 'completed')} className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-green-500 text-white px-8 py-4 rounded-xl font-bold shadow-lg shadow-green-200 active:scale-95"><Icons.Check/> เสร็จสิ้น</button>
+                                                <button onClick={() => updateStatus(currentServing.id, 'cancelled')} className="flex-1 min-w-[100px] flex items-center justify-center gap-2 bg-white border border-red-200 text-red-500 px-6 py-4 rounded-xl font-bold active:scale-95"><Icons.Cross/> ยกเลิก</button>
                                             </div>
                                         </div>
                                     ) : (
@@ -538,12 +578,12 @@
                                     <div className="p-6 border-b border-slate-100 h-16 flex justify-between items-center"><h2 className="font-bold text-slate-800 flex items-center gap-2"><Icons.Users className="text-indigo-600"/> Waiting ({waitingQueues.length})</h2></div>
                                     <div className="divide-y divide-slate-50">
                                         {waitingQueues.length > 0 ? waitingQueues.map((q) => (
-                                            <div key={q.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-14 h-14 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-xl text-slate-600">{q.number}</div>
+                                            <div key={q.id} className="p-4 flex flex-col sm:flex-row items-center justify-between hover:bg-slate-50 gap-4">
+                                                <div className="flex items-center gap-4 w-full sm:w-auto">
+                                                    <div className="w-14 h-14 bg-slate-100 rounded-lg flex-shrink-0 flex items-center justify-center font-bold text-xl text-slate-600">{q.number}</div>
                                                     <div><div className="font-bold text-slate-800 text-lg">{q.name}</div><div className="text-xs text-slate-400">{q.timestamp}</div></div>
                                                 </div>
-                                                <button onClick={() => updateStatus(q.id, 'serving')} disabled={!!currentServing} className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold text-sm shadow-sm ${currentServing ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}><Icons.Bell size={18}/> เรียกคิว</button>
+                                                <button onClick={() => updateStatus(q.id, 'serving')} disabled={!!currentServing} className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-bold text-sm shadow-sm ${currentServing ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}><Icons.Bell size={18}/> เรียกคิว</button>
                                             </div>
                                         )) : <div className="p-10 text-center text-slate-400">ไม่มีคิวรอเรียก</div>}
                                     </div>
