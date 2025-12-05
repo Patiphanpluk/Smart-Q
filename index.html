@@ -150,7 +150,7 @@
                     spokenText += " เข้ารับบริการ"; 
                 } else {
                     spokenText = "หมายเลข " + numberText;
-                    spokenText += " ถึงคิวแล้ว";
+                    spokenText += " ถึงคิวของคุณแล้ว";
                 }
                 const utterance = new SpeechSynthesisUtterance(spokenText);
                 utterance.lang = 'th-TH'; utterance.rate = 0.85; utterance.volume = 1;
@@ -209,7 +209,6 @@
             );
         };
 
-        // --- Beautiful Centered Toast Component ---
         const Toast = ({ message, type, show }) => {
             if (!show) return null;
             return (
@@ -241,11 +240,10 @@
             const [showSettings, setShowSettings] = useState(false);
             const [showHistory, setShowHistory] = useState(null); 
             
-            // Popups & Toast State
             const [showSkipPopup, setShowSkipPopup] = useState(false);
             const [showClearPopup, setShowClearPopup] = useState(false);
-            const [showConfirmPopup, setShowConfirmPopup] = useState(null); // { id, type: 'delete'|'other' }
-            const [showEditPopup, setShowEditPopup] = useState(null); // { queue }
+            const [showConfirmPopup, setShowConfirmPopup] = useState(null); 
+            const [showEditPopup, setShowEditPopup] = useState(null); 
             
             const [skipNote, setSkipNote] = useState('');
             const [clearPassword, setClearPassword] = useState('');
@@ -265,28 +263,59 @@
             
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'my-queue-app';
 
-            // Show Toast Helper
             const showToastFn = (message, type = 'success') => {
                 setToast({ show: true, message, type });
                 setTimeout(() => setToast(prev => ({ ...prev, show: false })), 2000);
             };
+
+            // Keyboard Shortcuts
+            useEffect(() => {
+                if (viewMode !== 'admin' || !isAdminAuthenticated) return;
+
+                const handleKeyDown = (e) => {
+                    // Prevent shortcuts if typing inputs/modals are active
+                    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+                    if (showSkipPopup || showClearPopup || showConfirmPopup || showEditPopup) return;
+
+                    if (e.key === 'ArrowRight') {
+                        // Call next queue
+                        const currentServing = queues.find(q => q.status === 'serving');
+                        if (currentServing) {
+                            showToastFn("ยังมีคิวที่กำลังให้บริการอยู่ (กด Enter เพื่อจบงาน)", 'error');
+                            return;
+                        }
+                        const nextQueue = queues.find(q => q.status === 'waiting');
+                        if (nextQueue) {
+                            updateStatus(nextQueue.id, 'serving');
+                        } else {
+                            showToastFn("ไม่มีคิวรอเรียก", 'error');
+                        }
+                    } 
+                    
+                    if (e.key === 'Enter') {
+                        // Finish current queue
+                        const currentServing = queues.find(q => q.status === 'serving');
+                        if (currentServing) {
+                            updateStatus(currentServing.id, 'completed');
+                        }
+                    }
+                };
+
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [viewMode, isAdminAuthenticated, queues, showSkipPopup, showClearPopup, showConfirmPopup, showEditPopup]);
 
             useEffect(() => {
                 try {
                     const { auth, db } = initFirebase();
                     setServices({ auth, db });
                     const unsubAuth = auth.onAuthStateChanged(async (u) => {
-                        if (u) {
-                            setUser(u); 
-                        } else {
+                        if (u) { setUser(u); } else {
                             try {
                                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                    try { await auth.signInWithCustomToken(__initial_auth_token); } 
-                                    catch { await auth.signInAnonymously(); }
+                                    try { await auth.signInWithCustomToken(__initial_auth_token); } catch { await auth.signInAnonymously(); }
                                 } else { await auth.signInAnonymously(); }
-                            } catch (authErr) {
-                                setErrorMsg("Auth Error: " + authErr.message); setConfigError(true); setLoading(false);
-                            }
+                            } catch (authErr) { setErrorMsg("Auth Error: " + authErr.message); setConfigError(true); setLoading(false); }
                         }
                     });
                     const params = new URLSearchParams(window.location.search);
@@ -297,7 +326,6 @@
                 } catch (err) { setErrorMsg(err.message); setConfigError(true); setLoading(false); }
             }, []);
 
-            // Focus management
             useEffect(() => { if (showSkipPopup && skipInputRef.current) setTimeout(() => skipInputRef.current?.focus({ preventScroll: true }), 50); }, [showSkipPopup]);
             useEffect(() => { if (showClearPopup) { setClearPassword(''); setTimeout(() => clearInputRef.current?.focus({ preventScroll: true }), 50); } }, [showClearPopup]);
             useEffect(() => { if (showEditPopup) { setEditName(showEditPopup.queue.name); setTimeout(() => editInputRef.current?.focus({ preventScroll: true }), 50); } }, [showEditPopup]);
