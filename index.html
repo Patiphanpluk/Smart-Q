@@ -100,7 +100,6 @@
         };
 
         // --- Sound Helper: Play Beep Sound (ติ๊ด-ติ๊ด) ---
-        // ใช้สำหรับลูกค้า (Kiosk) เท่านั้น
         const playBeepSound = () => {
             if ("vibrate" in navigator) {
                 try { navigator.vibrate([200, 100, 200]); } catch(e){}
@@ -133,7 +132,6 @@
         };
 
         // --- TTS Helper: พูดสาย ---
-        // mode: 'display' = "ขอเชิญหมายเลข... คุณ... เข้ารับบริการ", 'client' = "หมายเลข... ถึงคิวของคุณแล้ว"
         const announceQueue = (queueNumber, customerName, mode = 'display') => {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel(); // หยุดเสียงเก่าก่อน
@@ -203,36 +201,20 @@
         // --- Wake Lock Hook (ป้องกันหน้าจอดับ) ---
         const useWakeLock = () => {
             const wakeLockRef = useRef(null);
-            
             const requestWakeLock = async () => {
                 if ('wakeLock' in navigator) {
-                    try {
-                        wakeLockRef.current = await navigator.wakeLock.request('screen');
-                        console.log('Wake Lock active');
-                    } catch (err) {
-                        console.error(`${err.name}, ${err.message}`);
-                    }
+                    try { wakeLockRef.current = await navigator.wakeLock.request('screen'); } 
+                    catch (err) { console.error(err); }
                 }
             };
-
             const releaseWakeLock = async () => {
-                if (wakeLockRef.current) {
-                    await wakeLockRef.current.release();
-                    wakeLockRef.current = null;
-                }
+                if (wakeLockRef.current) { await wakeLockRef.current.release(); wakeLockRef.current = null; }
             };
-
-            // Re-request wake lock if visibility changes (e.g., user switches tabs and comes back)
             useEffect(() => {
-                const handleVisibilityChange = () => {
-                    if (wakeLockRef.current !== null && document.visibilityState === 'visible') {
-                        requestWakeLock();
-                    }
-                };
+                const handleVisibilityChange = () => { if (wakeLockRef.current !== null && document.visibilityState === 'visible') requestWakeLock(); };
                 document.addEventListener('visibilitychange', handleVisibilityChange);
                 return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
             }, []);
-
             return { requestWakeLock, releaseWakeLock };
         };
 
@@ -253,6 +235,12 @@
             const [showSettings, setShowSettings] = useState(false);
             const [showHistory, setShowHistory] = useState(null); 
             
+            // Skip Popup State
+            const [showSkipPopup, setShowSkipPopup] = useState(false);
+            const [skipNote, setSkipNote] = useState('');
+            const [queueToSkip, setQueueToSkip] = useState(null);
+            const [savedNotes, setSavedNotes] = useState([]);
+
             const lastAnnouncedMyQueueRef = useRef(null);
             const lastAnnouncedDisplayRef = useRef(null);
             const { requestWakeLock } = useWakeLock();
@@ -311,8 +299,10 @@
                     : services.db.collection('settings').doc('main');
 
                 const unsubSettings = settingsRef.onSnapshot(doc => {
-                    if (doc.exists && doc.data().queuePrefix) {
-                        setQueuePrefix(doc.data().queuePrefix);
+                    if (doc.exists) {
+                        const data = doc.data();
+                        if (data.queuePrefix) setQueuePrefix(data.queuePrefix);
+                        if (data.savedNotes) setSavedNotes(data.savedNotes);
                     }
                 }, err => console.log("Settings sync skipped"));
 
@@ -334,17 +324,10 @@
                     const isNewCall = !lastPlayed || lastPlayed.id !== myQ.id || lastPlayed.calledAt !== myQ.calledAt;
 
                     if (isNewCall) {
-                        // REMOVED NOTIFICATION LOGIC HERE
-                        
-                        // 2. เสียงเตือนสำหรับลูกค้า
-                        // เล่นเสียงติ๊ดๆ ก่อน
                         playBeepSound(); 
-                        
-                        // รอให้ติ๊ดจบ (ประมาณ 0.8 วิ) แล้วค่อยพูด
                         setTimeout(() => {
                             announceQueue(myQ.number, myQ.name, 'client'); 
                         }, 1000);
-                        
                         lastAnnouncedMyQueueRef.current = { id: myQ.id, calledAt: myQ.calledAt };
                     }
                 }
@@ -362,13 +345,9 @@
                     const isNewCall = !lastPlayed || lastPlayed.id !== currentServing.id || lastPlayed.calledAt !== currentServing.calledAt;
 
                     if (isNewCall) {
-                        // ไม่เล่นเสียงติ๊ด (playBeepSound) ที่หน้า Display ตามคำขอ
-                        // ไม่ส่ง Notification
-                        // พูดทันที
                         setTimeout(() => {
                             announceQueue(currentServing.number, currentServing.name, 'display');
                         }, 500);
-                        
                         lastAnnouncedDisplayRef.current = { id: currentServing.id, calledAt: currentServing.calledAt };
                     }
                 }
@@ -391,10 +370,6 @@
                 e.preventDefault();
                 if (!customerName.trim() || !services || !user) return;
                 setIsSubmitting(true);
-                
-                // REMOVED Notification.requestPermission()
-
-                // เรียกใช้ Wake Lock เพื่อไม่ให้หน้าจอดับ (สำคัญมากสำหรับ iOS/Android เพื่อให้เสียงดังได้ตลอด)
                 await requestWakeLock();
 
                 // Unlock Audio context
@@ -461,47 +436,64 @@
                 } catch (err) { console.error(err); }
             };
 
-            // ฟังก์ชันข้ามคิว
-            const handleSkip = async (queue) => {
-                if (!user) return;
-                let note = prompt("ระบุหมายเหตุการข้าม (ถ้าไม่ระบุระบบจะใส่ว่า 'ข้าม'):");
-                if (note === null) return; // กดยกเลิก
-                if (note.trim() === "") note = "ข้าม";
+            // Trigger Skip Popup
+            const openSkipPopup = (queue) => {
+                setQueueToSkip(queue);
+                setSkipNote('');
+                setShowSkipPopup(true);
+            };
 
-                const currentSkipCount = queue.skipCount || 0;
-                let newCreatedAt = queue.createdAt;
+            // Process Skip
+            const handleConfirmSkip = async () => {
+                if (!user || !queueToSkip) return;
                 
-                // หาคิวที่กำลังรออยู่
-                const waitingList = queues.filter(q => q.status === 'waiting');
-                const currentIndex = waitingList.findIndex(q => q.id === queue.id);
+                const noteToSave = skipNote.trim() === "" ? "ข้าม" : skipNote.trim();
+                
+                // Save note to history if new
+                if (!savedNotes.includes(noteToSave)) {
+                    try {
+                        let settingsRef = (typeof __app_id !== 'undefined')
+                            ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main')
+                            : services.db.collection('settings').doc('main');
+                        
+                        await settingsRef.set({ savedNotes: [...savedNotes, noteToSave] }, { merge: true });
+                    } catch(e) { console.error("Failed to save note history", e); }
+                }
 
-                // ตรรกะ:
-                // ถ้ายังไม่เคยข้าม (skipCount == 0): ให้ไปต่อท้ายคนถัดไป (ลำดับ 2)
-                // ถ้าข้ามมาแล้ว 1 รอบ (skipCount >= 1): ให้ไปท้ายสุด (Date.now())
+                const currentSkipCount = queueToSkip.skipCount || 0;
+                let newCreatedAt = queueToSkip.createdAt;
+                
+                // Logic: 0 -> 2nd pos, >=1 -> Last pos
+                const waitingList = queues.filter(q => q.status === 'waiting');
                 
                 if (currentSkipCount === 0) {
-                    // ข้ามครั้งแรก -> ไปลำดับ 2
-                    if (currentIndex !== -1 && currentIndex < waitingList.length - 1) {
-                        const nextQueue = waitingList[currentIndex + 1];
-                        // ตั้งเวลาให้มากกว่าคนถัดไปนิดหน่อย เพื่อให้ไปอยู่ต่อจากเขา
+                    if (waitingList.length > 0) {
+                        const nextQueue = waitingList[0]; // คนที่รออยู่คนแรก
+                        // ให้คนที่เราข้าม (queueToSkip) ไปอยู่ต่อจากคนแรกนี้
+                        // คือ newCreatedAt ต้องมากกว่า nextQueue.createdAt
                         newCreatedAt = nextQueue.createdAt + 1; 
+                    } else {
+                        // ถ้าไม่มีใครรออยู่เลย ก็ให้เป็นเวลาปัจจุบัน (ต่อท้าย)
+                        newCreatedAt = Date.now();
                     }
-                    // ถ้าไม่มีคนถัดไป (เป็นคนสุดท้ายอยู่แล้ว) ก็อยู่ที่เดิม
                 } else {
-                    // ข้ามครั้งที่ 2 -> ไปท้ายแถว
                     newCreatedAt = Date.now();
                 }
 
                 try {
                     let docRef = (typeof __app_id !== 'undefined') 
-                        ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('queues').doc(queue.id)
-                        : services.db.collection('queues').doc(queue.id);
+                        ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('queues').doc(queueToSkip.id)
+                        : services.db.collection('queues').doc(queueToSkip.id);
 
                     await docRef.update({
-                        note: note,
+                        status: 'waiting', // กลับไปรอ
+                        note: noteToSave,
                         skipCount: currentSkipCount + 1,
                         createdAt: newCreatedAt
                     });
+                    
+                    setShowSkipPopup(false);
+                    setQueueToSkip(null);
                 } catch (err) {
                     console.error(err);
                     alert(err.message);
@@ -666,8 +658,13 @@
                                                         <span>Waiting</span>
                                                         <span>• {q.timestamp}</span>
                                                     </div>
-                                                    {q.note && <div className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded inline-block mt-1 font-bold">{q.note}</div>}
                                                 </div>
+                                                {/* หมายเหตุแสดงขวาสุด */}
+                                                {q.note && (
+                                                    <div className="ml-auto text-xs text-red-500 bg-red-50 px-3 py-1 rounded-lg font-bold border border-red-100 whitespace-nowrap">
+                                                        {q.note}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -712,6 +709,7 @@
                                                 <div className="text-xl font-medium text-slate-600">คุณ {currentServing.name}</div>
                                             </div>
                                             <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
+                                                <button onClick={() => openSkipPopup(currentServing)} className="flex-1 min-w-[140px] whitespace-nowrap flex items-center justify-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 px-6 py-4 rounded-xl font-bold active:scale-95 transition-all"><Icons.Skip size={20}/> ข้าม</button>
                                                 <button onClick={() => handleRecall(currentServing.id)} className="flex-1 min-w-[140px] whitespace-nowrap flex items-center justify-center gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-6 py-4 rounded-xl font-bold active:scale-95 transition-all"><Icons.Volume size={20}/> เรียกซ้ำ</button>
                                                 <button onClick={() => updateStatus(currentServing.id, 'completed')} className="flex-1 min-w-[140px] whitespace-nowrap flex items-center justify-center gap-2 bg-green-500 text-white px-6 py-4 rounded-xl font-bold shadow-lg shadow-green-200 active:scale-95"><Icons.Check/> เสร็จสิ้น</button>
                                                 <button onClick={() => updateStatus(currentServing.id, 'cancelled')} className="flex-1 min-w-[140px] whitespace-nowrap flex items-center justify-center gap-2 bg-white border border-red-200 text-red-500 px-6 py-4 rounded-xl font-bold active:scale-95"><Icons.Cross/> ยกเลิก</button>
@@ -737,14 +735,9 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                                                    <button onClick={() => handleSkip(q)} disabled={!!currentServing} className={`flex-1 sm:flex-none flex items-center justify-center gap-1 px-4 py-2 rounded-lg font-bold text-sm shadow-sm bg-amber-100 text-amber-700 hover:bg-amber-200`}>
-                                                        <Icons.Skip size={16}/> ข้าม
-                                                    </button>
-                                                    <button onClick={() => updateStatus(q.id, 'serving')} disabled={!!currentServing} className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-bold text-sm shadow-sm ${currentServing ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}>
-                                                        <Icons.Bell size={18}/> เรียกคิว
-                                                    </button>
-                                                </div>
+                                                <button onClick={() => updateStatus(q.id, 'serving')} disabled={!!currentServing} className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-bold text-sm shadow-sm ${currentServing ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'}`}>
+                                                    <Icons.Bell size={18}/> เรียกคิว
+                                                </button>
                                             </div>
                                         )) : <div className="p-10 text-center text-slate-400">ไม่มีคิวรอเรียก</div>}
                                     </div>
@@ -763,6 +756,34 @@
                             </div>
                         </div>
                     </main>
+
+                    {showSkipPopup && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in">
+                                <h2 className="font-bold text-xl mb-4 text-amber-600 flex items-center gap-2"><Icons.Skip size={24}/> ข้ามคิว {queueToSkip?.number}</h2>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">ระบุหมายเหตุการข้าม</label>
+                                <input autoFocus type="text" value={skipNote} onChange={e => setSkipNote(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2 mb-4" placeholder="เช่น ไม่พร้อม, เข้าห้องน้ำ" />
+                                
+                                {savedNotes.length > 0 && (
+                                    <div className="mb-4">
+                                        <div className="text-xs text-slate-400 mb-2">เลือกข้อความเดิม:</div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {savedNotes.map((note, idx) => (
+                                                <button key={idx} onClick={() => setSkipNote(note)} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-md text-slate-600 transition-colors">
+                                                    {note}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowSkipPopup(false)} className="flex-1 py-2 text-slate-500 hover:bg-slate-100 rounded-xl">ยกเลิก</button>
+                                    <button onClick={handleConfirmSkip} className="flex-1 py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600">ยืนยันข้าม</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {showSettings && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
