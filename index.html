@@ -242,20 +242,18 @@
             const [audioEnabled, setAudioEnabled] = useState(false);
             const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
             
-            // Settings State
             const [queuePrefix, setQueuePrefix] = useState('A'); 
-            const [qrEnabled, setQrEnabled] = useState(false); // QR Code System Toggle
+            const [qrEnabled, setQrEnabled] = useState(false);
             
             const [showSettings, setShowSettings] = useState(false);
             const [showHistory, setShowHistory] = useState(null); 
             
-            // Popups & Toast State
             const [showSkipPopup, setShowSkipPopup] = useState(false);
             const [showClearPopup, setShowClearPopup] = useState(false);
             const [showConfirmPopup, setShowConfirmPopup] = useState(null); 
             const [showEditPopup, setShowEditPopup] = useState(null); 
-            const [showScanner, setShowScanner] = useState(false); // Scanner Popup
-            const [showScannedAction, setShowScannedAction] = useState(null); // Action Popup after scan { queue }
+            const [showScanner, setShowScanner] = useState(false); 
+            const [showScannedAction, setShowScannedAction] = useState(null); 
             
             const [skipNote, setSkipNote] = useState('');
             const [clearPassword, setClearPassword] = useState('');
@@ -268,7 +266,7 @@
             const skipInputRef = useRef(null);
             const clearInputRef = useRef(null);
             const editInputRef = useRef(null);
-            const scannerRef = useRef(null); // For HTML5QrcodeScanner cleanup
+            const scannerRef = useRef(null); 
 
             const lastAnnouncedMyQueueRef = useRef(null);
             const lastAnnouncedDisplayRef = useRef(null);
@@ -281,10 +279,8 @@
                 setTimeout(() => setToast(prev => ({ ...prev, show: false })), 2000);
             };
 
-            // Keyboard Shortcuts
             useEffect(() => {
                 if (viewMode !== 'admin' || !isAdminAuthenticated) return;
-
                 const handleKeyDown = (e) => {
                     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
                     if (showSkipPopup || showClearPopup || showConfirmPopup || showEditPopup || showScanner || showScannedAction) return;
@@ -305,15 +301,12 @@
                         if (currentServing) updateStatus(currentServing.id, 'completed');
                     }
                 };
-
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
             }, [viewMode, isAdminAuthenticated, queues, showSkipPopup, showClearPopup, showConfirmPopup, showEditPopup, showScanner, showScannedAction]);
 
-            // Scanner Logic
             useEffect(() => {
                 if (showScanner) {
-                    // Small delay to wait for DOM to be ready
                     const timer = setTimeout(() => {
                         if (!scannerRef.current) {
                             const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
@@ -379,7 +372,7 @@
                     if (doc.exists) { 
                         const data = doc.data(); 
                         if (data.queuePrefix) setQueuePrefix(data.queuePrefix); 
-                        if (data.savedNotes) setSavedNotes(data.savedNotes);
+                        setSavedNotes(data.savedNotes || []); // Ensure array or empty
                         if (data.qrEnabled !== undefined) setQrEnabled(data.qrEnabled);
                     }
                 }, err => console.log("Settings sync skipped"));
@@ -442,7 +435,7 @@
                     let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('queues').doc(id) : services.db.collection('queues').doc(id);
                     const updateData = { status }; if (status === 'serving') updateData.calledAt = Date.now();
                     await docRef.update(updateData);
-                    if(showScannedAction) setShowScannedAction(null); // Close popup if open
+                    if(showScannedAction) setShowScannedAction(null); 
                 } catch (err) { console.error(err); }
             };
 
@@ -505,18 +498,17 @@
                 if (!user) return;
                 try {
                     const batch = services.db.batch();
-                    // 1. Clear Queues
                     let collectionRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('queues') : services.db.collection('queues');
                     const snapshot = await collectionRef.get();
                     snapshot.docs.forEach((doc) => batch.delete(doc.ref));
 
-                    // 2. Clear Saved Notes in Settings
                     let settingsRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
                     batch.set(settingsRef, { savedNotes: [] }, { merge: true });
 
                     await batch.commit();
+                    setSavedNotes([]); setQueues([]); // Instant UI update
                     setShowClearPopup(false);
-                    showToastFn("ล้างข้อมูลเรียบร้อยแล้ว", 'success');
+                    showToastFn("ล้างข้อมูลและประวัติเรียบร้อยแล้ว", 'success');
                 } catch (err) { showToastFn("Error clearing: " + err.message, 'error'); }
             };
 
@@ -592,8 +584,6 @@
                                             <span className="text-slate-400">ชื่อผู้จอง</span>
                                             <span className="font-bold text-slate-700 truncate max-w-[150px]">{myQueue.name}</span>
                                         </div>
-                                        
-                                        {/* QR Code Display */}
                                         {qrEnabled && (
                                             <div className="flex flex-col items-center border-t border-slate-100 pt-4 mt-2">
                                                 <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${myQueue.id}`} alt="QR Code" className="w-32 h-32" />
@@ -745,10 +735,10 @@
 
                     {showScanner && (
                         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[70]">
-                            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in relative">
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-fade-in relative">
                                 <button onClick={() => setShowScanner(false)} className="absolute top-2 right-2 text-slate-400 hover:text-slate-600"><Icons.Cross size={24}/></button>
                                 <h2 className="font-bold text-xl mb-4 text-center">สแกน QR Code</h2>
-                                <div id="reader" className="w-full h-64 bg-slate-100 rounded-lg overflow-hidden"></div>
+                                <div id="reader" className="w-full bg-slate-100 rounded-lg overflow-hidden min-h-[300px]"></div>
                                 <p className="text-xs text-center text-slate-400 mt-2">วาง QR Code ให้อยู่ในกรอบ</p>
                             </div>
                         </div>
