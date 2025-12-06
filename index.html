@@ -304,10 +304,10 @@
             
             // GAS Integration State
             const [gasWebAppUrl, setGasWebAppUrl] = useState('https://script.google.com/macros/s/AKfycbyHQ4b_69fLsfIV2rh8EMIkE3s3KlZVTz6im2btIAsvVAQJWJ5N6OrjO6sfLtNtSjykaQ/exec'); 
-            const [masterLinkC1, setMasterLinkC1] = useState(''); 
+            const [masterLinkC1, setMasterLinkC1] = useState(''); // Kept for state consistency, removed from UI
             
             const [externalLinkLabel, setExternalLinkLabel] = useState('เปิดเอกสาร / โฟลเดอร์คิว'); 
-            const [useGasForLink, setUseGasForLink] = useState(false); 
+            const [useGasForLink, setUseGasForLink] = useState(true); // FIX: Default to GAS mode (Sheet Linker) as it's the required mode
             const [testQueueId, setTestQueueId] = useState(''); 
             
             const [showSettings, setShowSettings] = useState(false);
@@ -496,42 +496,7 @@
 
             // 2. Save Master Link to GAS (Write C1) (KEPT FOR CONSISTENCY BUT NOT USED IN NEW UI)
             const handleSaveToGAS = async () => {
-                if (!gasWebAppUrl) {
-                    showToastFn("กรุณาระบุ GAS Web App URL", "error");
-                    return;
-                }
-                
-                try {
-                    showToastFn("กำลังส่งข้อมูลไป GAS (C1)...", "success");
-                    
-                    // Send as text/plain to avoid CORS preflight issues with GAS
-                    const payload = { link: masterLinkC1 };
-                    
-                    const response = await fetch(gasWebAppUrl, {
-                        method: 'POST',
-                        body: JSON.stringify(payload),
-                        headers: {
-                            'Content-Type': 'text/plain;charset=utf-8', 
-                        }
-                    });
-
-                    // GAS response might be opaque in no-cors, but we try standard first
-                    const text = await response.text();
-                    
-                    if (text.includes("Success")) {
-                        showToastFn("บันทึกข้อมูลลง C1 เรียบร้อย", "success");
-                         // Auto save locally
-                        if (user && services) {
-                            let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
-                            await docRef.set({ masterLinkC1: masterLinkC1 }, { merge: true });
-                        }
-                    } else {
-                        showToastFn("เกิดข้อผิดพลาด: " + text, "error");
-                    }
-                } catch (error) {
-                    showToastFn("Error: " + error.message, "error");
-                    console.error(error);
-                }
+                // This function is kept for code consistency but the UI elements that call it have been removed.
             };
 
             // --- Handle Audio Enable ---
@@ -674,7 +639,8 @@
                         if (data.externalLinkEnabled !== undefined) setExternalLinkEnabled(data.externalLinkEnabled);
                         if (data.externalLinkMapping !== undefined) setExternalLinkMapping(data.externalLinkMapping);
                         if (data.externalLinkLabel !== undefined) setExternalLinkLabel(data.externalLinkLabel);
-                        if (data.useGasForLink !== undefined) setUseGasForLink(data.useGasForLink);
+                        // FIX: Remove dependency on useGasForLink from Firestore, and default it to true in state
+                        // if (data.useGasForLink !== undefined) setUseGasForLink(data.useGasForLink);
                         if (data.gasWebAppUrl !== undefined) setGasWebAppUrl(data.gasWebAppUrl);
                         if (data.masterLinkC1 !== undefined) setMasterLinkC1(data.masterLinkC1);
                     }
@@ -684,7 +650,8 @@
 
             // --- Auto-Sync External Link Mapping Interval (5 seconds) ---
             useEffect(() => {
-                const isGasLinkerActive = externalLinkEnabled && useGasForLink && gasWebAppUrl;
+                // FIX: useGasForLink is now always true in state, so we check externalLinkEnabled
+                const isGasLinkerActive = externalLinkEnabled && gasWebAppUrl;
                 if (!services?.db || !user || !isGasLinkerActive) return;
 
                 // Function to perform the sync silently for auto-run
@@ -731,7 +698,7 @@
                 }, 5000); // 5 seconds interval
 
                 return () => clearInterval(intervalId);
-            }, [services, user, externalLinkEnabled, useGasForLink, gasWebAppUrl]);
+            }, [services, user, externalLinkEnabled, gasWebAppUrl]);
             // --- END Auto-Sync External Link Mapping Interval ---
 
             useEffect(() => {
@@ -991,7 +958,7 @@
                         externalLinkEnabled: externalLinkEnabled,
                         externalLinkMapping: externalLinkMapping,
                         externalLinkLabel: externalLinkLabel,
-                        useGasForLink: useGasForLink,
+                        useGasForLink: true, // FIX: Always save as true since manual option is removed
                         gasWebAppUrl: gasWebAppUrl,
                         masterLinkC1: masterLinkC1
                     }, { merge: true });
@@ -1593,7 +1560,7 @@
                                         <ToggleSwitch checked={historyEnabled} onChange={() => setHistoryEnabled(!historyEnabled)} />
                                     </div>
 
-                                    {/* External Link Toggle */}
+                                    {/* External Link Toggle (Simplified UI) */}
                                     <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                                         <div className="flex items-center justify-between mb-4">
                                             <span className="text-sm font-bold text-slate-700 flex items-center gap-3"><Icons.Folder size={20} className="text-slate-400"/> ระบบลิ้งค์เอกสาร</span>
@@ -1602,63 +1569,32 @@
                                         
                                         {externalLinkEnabled && (
                                             <div className="mt-4 space-y-4 border-t border-slate-200 pt-4 animate-fade-in">
-                                                <div className="flex bg-slate-100 rounded-xl p-1 mb-3">
-                                                    <button 
-                                                        onClick={() => setUseGasForLink(false)}
-                                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!useGasForLink ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                                    >
-                                                        กำหนดเอง
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => setUseGasForLink(true)}
-                                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${useGasForLink ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                                                    >
-                                                        Google Sheet (GAS)
-                                                    </button>
+                                                
+                                                {/* 1. GAS Web App URL */}
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1 flex items-center gap-1"><Icons.GoogleScript size={12}/> Google Apps Script URL (Web App)</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={gasWebAppUrl || ''} 
+                                                        onChange={e => setGasWebAppUrl(e.target.value)} 
+                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
+                                                        placeholder="https://script.google.com/..." 
+                                                    />
                                                 </div>
 
-                                                {useGasForLink ? (
-                                                    <div className="space-y-4">
-                                                        <div>
-                                                            <label className="block text-xs font-bold text-slate-500 mb-1 ml-1 flex items-center gap-1"><Icons.GoogleScript size={12}/> Google Apps Script URL (Web App)</label>
-                                                            <input 
-                                                                type="text" 
-                                                                value={gasWebAppUrl || ''} 
-                                                                onChange={e => setGasWebAppUrl(e.target.value)} 
-                                                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                                                                placeholder="https://script.google.com/..." 
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* --- START FIX: Show Auto-Sync Status and remove manual buttons (1. & 2.) --- */}
-                                                        <div className="bg-white p-3 rounded-xl border border-slate-200 text-center space-y-2">
-                                                            <h4 className="text-sm font-bold text-indigo-700 flex items-center justify-center gap-2">
-                                                                <Icons.Sync size={16} className="text-amber-500 animate-spin"/> อ่านลิ้งค์จาก Sheet (A-B)
-                                                            </h4>
-                                                            <p className="text-xs text-slate-600">
-                                                                ระบบจะดึงข้อมูลอัตโนมัติทุก <span className="font-bold text-indigo-600">5 วินาที</span> (ไม่ต้องกดเอง)
-                                                            </p>
-                                                            <div className="text-[10px] text-slate-400 font-mono h-12 overflow-hidden whitespace-pre-wrap border border-slate-100 bg-slate-50 p-1 rounded-md mx-auto max-w-full text-left">
-                                                                {externalLinkMapping.substring(0, 100) || 'รอการดึงข้อมูล...'}
-                                                            </div>
-                                                            <p className="text-[10px] text-slate-400">แสดงผลลัพธ์ที่ดึงมาบางส่วน (คีย์, ลิ้งค์...)</p>
-                                                        </div>
-                                                        {/* --- END FIX --- */}
+                                                {/* 2. Link Button Label */}
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">ข้อความบนปุ่มลิ้งค์</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={externalLinkLabel || ''} 
+                                                        onChange={e => setExternalLinkLabel(e.target.value)} 
+                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
+                                                        placeholder="เปิดเอกสาร" 
+                                                    />
+                                                </div>
 
-                                                    </div>
-                                                ) : (
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">ตารางลิ้งค์ (รูปแบบ: เลขคิว, ลิ้งค์)</label>
-                                                        <textarea 
-                                                            value={externalLinkMapping || ''} 
-                                                            onChange={e => setExternalLinkMapping(e.target.value)} 
-                                                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all h-32 resize-y font-mono" 
-                                                            placeholder="A-001, https://drive.google.com/...\nA-002, https://drive.google.com/..." 
-                                                        />
-                                                        <p className="text-[10px] text-slate-400 mt-1">ใส่ 1 บรรทัดต่อ 1 คิว (คั่นด้วยเครื่องหมายจุลภาค หรือเว้นวรรค)</p>
-                                                    </div>
-                                                )}
-
+                                                {/* 3. Link Test (Keep the test functionality) */}
                                                 <div className="flex gap-2 items-center">
                                                     <input 
                                                         type="text" 
@@ -1675,16 +1611,20 @@
                                                     </button>
                                                 </div>
                                                 
-                                                <div>
-                                                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">ข้อความบนปุ่มลิ้งค์</label>
-                                                    <input 
-                                                        type="text" 
-                                                        value={externalLinkLabel || ''} 
-                                                        onChange={e => setExternalLinkLabel(e.target.value)} 
-                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                                                        placeholder="เปิดเอกสาร" 
-                                                    />
+                                                {/* Auto-Sync Status Display */}
+                                                <div className="bg-white p-3 rounded-xl border border-slate-200 text-center space-y-2">
+                                                    <h4 className="text-sm font-bold text-indigo-700 flex items-center justify-center gap-2">
+                                                        <Icons.Sync size={16} className="text-amber-500 animate-spin"/> อ่านลิ้งค์จาก Sheet (A-B)
+                                                    </h4>
+                                                    <p className="text-xs text-slate-600">
+                                                        ระบบจะดึงข้อมูลอัตโนมัติทุก <span className="font-bold text-indigo-600">5 วินาที</span> (ไม่ต้องกดเอง)
+                                                    </p>
+                                                    <div className="text-[10px] text-slate-400 font-mono h-12 overflow-hidden whitespace-pre-wrap border border-slate-100 bg-slate-50 p-1 rounded-md mx-auto max-w-full text-left">
+                                                        {externalLinkMapping.substring(0, 100) || 'รอการดึงข้อมูล...'}
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400">แสดงผลลัพธ์ที่ดึงมาบางส่วน (คีย์, ลิ้งค์...)</p>
                                                 </div>
+
                                             </div>
                                         )}
                                     </div>
@@ -1742,7 +1682,7 @@
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
                             <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in border-t-4 border-red-500">
                                 <h2 className="font-bold text-xl mb-4 text-red-600 flex items-center gap-2"><Icons.Trash size={24}/> ยืนยันการล้างคิว</h2>
-                                <p className="text-sm text-slate-600 mb-4">การกระทำนี้ไม่สามารถกู้คืนได้ **ประวัติการจองของลูกค้าบน Kiosk จะถูกล้าง** กรุณาใส่รหัสผ่านเพื่อยืนยัน</p>
+                                <p className="text-sm text-slate-600 mb-4">การกระทำนี้ไม่สามารถกู้คืนได้ **ประวัติการจองของลูกค้าทั้งหมดจะหายไป** กรุณาใส่รหัสผ่านเพื่อยืนยัน</p>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">รหัสผ่าน Admin</label>
                                 <input 
                                     ref={clearInputRef}
