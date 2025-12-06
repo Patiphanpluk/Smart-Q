@@ -104,7 +104,7 @@
         
         const Icons = {
             User: (p) => <Icon d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M12 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8" {...p} />,
-            Monitor: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>,
+            Monitor: (p) => <svg xmlns="http://www.w3.org/24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>,
             Bell: (p) => <Icon d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9 M10.3 21a1.94 1.94 0 0 0 3.4 0" {...p} />,
             Check: (p) => <Icon d="M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4 12 14.01l-3-3" {...p} />,
             Clock: (p) => <Icon d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20 M12 6v6l4 2" {...p} />,
@@ -1745,12 +1745,14 @@
                                                 <div className="bg-white p-3 rounded-xl border border-slate-200 text-center space-y-2">
                                                     <div className="flex items-center justify-center gap-2">
                                                         <h4 className="text-sm font-bold text-indigo-700 flex items-center gap-2">
+                                                            {/* START: Centered, with Loader Icon */}
+                                                            {externalLinkEnabled && gasWebAppUrl && (
+                                                                <Icons.Sync size={16} className="text-amber-500 animate-spin" />
+                                                            )}
                                                             สถานะการอ่านลิ้งค์จาก Sheet (A-B)
+                                                            {/* END: Centered, with Loader Icon */}
                                                         </h4>
-                                                        {/* Icon for Sync Status */}
-                                                        {externalLinkEnabled && gasWebAppUrl && (
-                                                            <Icons.Sync size={16} className="text-amber-500 animate-spin" />
-                                                        )}
+                                                        
                                                         {/* NEW: Button to view data table */}
                                                         {externalLinkMapping && (
                                                             <button 
