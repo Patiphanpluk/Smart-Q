@@ -52,9 +52,18 @@
             background-color: #4F46E5;
         }
         /* Custom class to ensure text wraps and takes full width in display mode */
+        /* display-name-full: OLD class, use 'display-name-nowrap' below instead for serving queue */
+        /*
         .display-name-full {
              word-break: break-word;
              white-space: normal;
+        }
+        */
+        /* Custom class for current serving name: Ensure single line (no-wrap) */
+        .display-name-nowrap {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
     </style>
 </head>
@@ -633,7 +642,7 @@
             // --- Handle Audio Enable ---
             const handleEnableAudio = () => {
                 initGlobalAudio();
-                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
+                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
                 const audio = new Audio(silentAudio);
                 
                 audio.play().then(() => { 
@@ -1592,11 +1601,49 @@
 
             const displayQueues = queues.filter(q => q.status === 'serving' || q.status === 'waiting');
             const currentDisplayServing = displayQueues.find(q => q.status === 'serving');
-            const waitingForDisplay = displayQueues.filter(q => q.status === 'waiting').sort((a, b) => a.createdAt - b.createdAt).slice(0, 7); // Show max 7 waiting queues
+            // Filter out the serving queue from the waiting list, sort by createdAt (oldest first) and take the first 7
+            const waitingForDisplay = displayQueues
+                .filter(q => q.status === 'waiting' && q.id !== currentDisplayServing?.id)
+                .sort((a, b) => a.createdAt - b.createdAt)
+                .slice(0, 7); 
             
             // Note: qrCodeData generation is now global (line ~1088)
 
             if (viewMode === 'display') {
+                
+                // ----------------------------------------------------
+                // START: NEW UI for "ปิดให้บริการ" (If no queues AND service is closed)
+                // ----------------------------------------------------
+                const isSystemClosed = !serviceOpen || (currentDisplayServing === undefined && waitingForDisplay.length === 0);
+                
+                if (isSystemClosed && !serviceOpen) {
+                    return (
+                        <div className="h-screen w-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center overflow-hidden">
+                            <div className="text-center w-full max-w-4xl">
+                                <div className="text-5xl font-black mb-8 text-red-500 flex items-center justify-center gap-4">
+                                    <Icons.Power size={60} className="text-red-500 animate-pulse"/>
+                                    ระบบปิดให้บริการชั่วคราว
+                                </div>
+                                <div className="text-[12rem] md:text-[18rem] font-black leading-none tracking-tight text-red-700/50 mb-10">
+                                    CLOSED
+                                </div>
+                                <div className="bg-white/10 backdrop-blur-sm px-12 py-8 rounded-3xl inline-block w-full max-w-xl shadow-2xl">
+                                    <span className="text-4xl md:text-6xl font-bold block text-white">
+                                        {closedReason || 'ปิดให้บริการเพื่อปรับปรุงระบบ'}
+                                    </span>
+                                </div>
+                                <div className="mt-8 text-2xl md:text-3xl text-red-300 font-bold">
+                                    กรุณาติดต่อช่องบริการในภายหลัง
+                                </div>
+                            </div>
+                            <div className="absolute bottom-4 left-4 text-xs text-slate-500">Q-Master Display Mode</div>
+                        </div>
+                    );
+                }
+                // ----------------------------------------------------
+                // END: NEW UI for "ปิดให้บริการ"
+                // ----------------------------------------------------
+                
                  return (
                     // FIXED: 1. เปลี่ยน min-h-screen เป็น h-screen และเพิ่ม flex-col
                     <div className="h-screen bg-slate-900 text-white p-4 sm:p-8 flex flex-col w-full overflow-hidden">
@@ -1622,38 +1669,28 @@
                                 
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
                                 
-                                {/* FIXED 1: Dynamic Title based on service status */}
+                                {/* FIXED 1: Dynamic Title based on service status (Removed serviceOpen check here as it's now handled by the outer block) */}
                                 <h2 className="text-2xl sm:text-3xl font-medium text-indigo-200 mb-8 uppercase tracking-widest">
-                                    {serviceOpen ? 'หมายเลขคิวปัจจุบัน' : 'สถานะบริการ'}
+                                     หมายเลขคิวปัจจุบัน
                                 </h2>
                                 
-                                {/* FIXED 1: Logic Block - Check service status first */}
-                                {serviceOpen ? (
-                                    currentDisplayServing ? (
-                                        <div className="text-center w-full"> 
-                                            <div className="text-8xl md:text-[10rem] lg:text-[14rem] font-black leading-none tracking-normal drop-shadow-lg text-white">
-                                                {currentDisplayServing.number}
-                                            </div>
-                                            <div className="mt-8 bg-white/20 backdrop-blur-md px-12 py-8 rounded-full inline-block w-full max-w-md">
-                                                <span className="text-3xl md:text-5xl font-bold block display-name-full">{currentDisplayServing.name}</span>
-                                            </div>
-                                            <div className="mt-10 text-2xl md:text-4xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
+                                {/* FIXED 1: Logic Block - Current Serving Queue UI */}
+                                {currentDisplayServing ? (
+                                    <div className="text-center w-full"> 
+                                        {/* แก้ไข 1.1: ลดขนาดหมายเลขคิว */}
+                                        <div className="text-7xl md:text-[8rem] lg:text-[12rem] font-black leading-none tracking-normal drop-shadow-lg text-white">
+                                            {currentDisplayServing.number}
                                         </div>
-                                    ) : (
-                                        <div className="text-center opacity-40">
-                                            <div className="text-8xl md:text-9xl font-black">---</div>
-                                            <div className="text-2xl mt-4 text-indigo-200">ไม่มีคิวเรียก (รอคิวถัดไป)</div>
+                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-12 py-6 rounded-full inline-block w-full max-w-2xl">
+                                            {/* แก้ไข 1.2: ลดขนาดชื่อลูกค้าและกำหนดให้เป็นแถวเดียว */}
+                                            <span className="text-3xl md:text-5xl font-bold block display-name-nowrap">คุณ {currentDisplayServing.name}</span>
                                         </div>
-                                    )
+                                        <div className="mt-10 text-2xl md:text-4xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
+                                    </div>
                                 ) : (
-                                    <div className="text-center w-full">
-                                        <div className="text-8xl md:text-[10rem] lg:text-[14rem] font-black leading-none tracking-normal drop-shadow-lg text-white opacity-60">
-                                            CLOSED
-                                        </div>
-                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-12 py-8 rounded-full inline-block w-full max-w-md">
-                                            <span className="text-3xl md:text-5xl font-bold block display-name-full">{closedReason || 'ปิดให้บริการชั่วคราว'}</span>
-                                        </div>
-                                        <div className="mt-10 text-2xl md:text-4xl text-red-300 font-bold">กรุณาติดต่อช่องบริการในภายหลัง</div>
+                                    <div className="text-center opacity-40">
+                                        <div className="text-8xl md:text-9xl font-black">---</div>
+                                        <div className="text-2xl mt-4 text-indigo-200">ไม่มีคิวเรียก (รอคิวถัดไป)</div>
                                     </div>
                                 )}
                             </div>
@@ -1679,13 +1716,15 @@
                                                 
                                                 {/* Line 1: Queue Number (Left) and Queue Count (Right) */}
                                                 <div className="flex items-end justify-between">
-                                                    <div className="text-3xl font-black text-indigo-300 whitespace-nowrap">{q.number}</div>
+                                                    {/* แก้ไข 1.3: ลดขนาดหมายเลขคิวที่รอคิว */}
+                                                    <div className="text-2xl font-black text-indigo-300 whitespace-nowrap">{q.number}</div>
                                                     <div className="text-sm text-slate-500">{index + 1} คิวถัดไป</div>
                                                 </div>
                                                 
                                                 {/* Line 2: Customer Name (Left) and Date/Time (Right) */}
                                                 <div className="flex items-end justify-between mt-1 pb-1">
-                                                    <div className="text-base font-medium text-slate-400 whitespace-normal break-words">{q.name}</div>
+                                                    {/* แก้ไข 1.4: ลดขนาดชื่อลูกค้าที่รอคิว */}
+                                                    <div className="text-base font-medium text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[70%]">{q.name}</div>
                                                     {/* FIXED: แสดงวันที่และเวลา */}
                                                     <span className="text-xs text-indigo-200 block font-medium flex-shrink-0">{formatDateTime(q.createdAt)}</span>
                                                 </div>
@@ -1710,11 +1749,11 @@
                                     )}
                                 </div>
 
-                                {/* FIXED 3: NEW QR CODE LOCATION (Floating Absolute Bottom Right) */}
+                                {/* แก้ไข 3: พื้นหลัง QR Code แบบเบลอ (backdrop-blur) */}
                                 {(qrEnabled || qrExpireEnabled) && (
                                     <div className="absolute bottom-0 right-0 p-4 z-10"> 
-                                        {/* FIXED: เพิ่ม bg-white, rounded-xl, shadow-2xl คลุมทั้งบล็อก */}
-                                        <div className="bg-white rounded-xl shadow-2xl p-3 text-center border border-white/90">
+                                        {/* แก้ไข 3: เพิ่ม backdrop-blur, bg-white/85, rounded-xl */}
+                                        <div className="backdrop-blur-sm bg-white/85 rounded-xl shadow-2xl p-3 text-center border border-white/90">
                                             
                                             {/* FIXED: ข้อความกำกับ (เปลี่ยนสีเป็น slate-800) */}
                                             <div className="text-xs font-bold text-slate-800 mb-1">สแกนเพื่อจองคิว</div>
