@@ -305,6 +305,7 @@
             // GAS Integration State
             const [gasWebAppUrl, setGasWebAppUrl] = useState('https://script.google.com/macros/s/AKfycbyHQ4b_69fLsfIV2rh8EMIkE3s3KlZVTz6im2btIAsvVAQJWJ5N6OrjO6sfLtNtSjykaQ/exec'); 
             const [masterLinkC1, setMasterLinkC1] = useState(''); // Link to send to C1
+            const [lastGasSyncTime, setLastGasSyncTime] = useState(null); // NEW: State for last sync time
             
             const [externalLinkLabel, setExternalLinkLabel] = useState('เปิดเอกสาร / โฟลเดอร์คิว'); 
             const [useGasForLink, setUseGasForLink] = useState(true); // Always true for simplified UI
@@ -361,6 +362,17 @@
             const showToastFn = (message, type = 'success') => {
                 setToast({ show: true, message, type });
                 setTimeout(() => setToast(prev => ({ ...prev, show: false })), 2000);
+            };
+
+            // Helper function to format timestamp
+            const formatTime = (timestamp) => {
+                if (!timestamp) return 'ยังไม่เคยดึงข้อมูล';
+                return new Date(timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            };
+
+            // Helper function to check if the link is a Google Drive link
+            const isGoogleDriveLink = (url) => {
+                return url && typeof url === 'string' && url.includes('drive.google.com/drive');
             };
 
             // Force body scroll settings based on view mode
@@ -463,6 +475,8 @@
                              return null;
                         }).filter(Boolean).join('\n');
 
+                        const currentTime = Date.now(); // Get current timestamp
+
                         // Update state
                         setExternalLinkMapping(prev => {
                             if (prev !== mappingString && isManualSync) {
@@ -471,11 +485,13 @@
                             }
                             return mappingString;
                         });
+
+                        setLastGasSyncTime(currentTime); // Update sync time
                         
                         // Only save to Firestore if it's a manual sync (to prevent excessive writes)
                         if (isManualSync && user && services) {
                             let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
-                            await docRef.set({ externalLinkMapping: mappingString }, { merge: true });
+                            await docRef.set({ externalLinkMapping: mappingString, lastGasSyncTime: currentTime }, { merge: true });
                         }
                     } else {
                         throw new Error("รูปแบบข้อมูลจาก GAS ไม่ถูกต้อง");
@@ -537,7 +553,7 @@
             // --- Handle Audio Enable ---
             const handleEnableAudio = () => {
                 initGlobalAudio();
-                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
+                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
                 const audio = new Audio(silentAudio);
                 
                 audio.play().then(() => { 
@@ -678,6 +694,7 @@
                         // if (data.useGasForLink !== undefined) setUseGasForLink(data.useGasForLink);
                         if (data.gasWebAppUrl !== undefined) setGasWebAppUrl(data.gasWebAppUrl);
                         if (data.masterLinkC1 !== undefined) setMasterLinkC1(data.masterLinkC1);
+                        if (data.lastGasSyncTime !== undefined) setLastGasSyncTime(data.lastGasSyncTime); // NEW: Load sync time
                     }
                 }, err => console.log("Settings sync skipped"));
                 return () => { unsubQueues(); unsubSettings(); };
@@ -698,6 +715,7 @@
                         if (!response.ok) throw new Error("GAS connection failed");
                         
                         const json = await response.json();
+                        const currentTime = Date.now(); // Get current timestamp
                         
                         if (Array.isArray(json)) {
                             const mappingString = json.map(row => {
@@ -716,6 +734,9 @@
                                 }
                                 return mappingString;
                             });
+                            
+                            setLastGasSyncTime(currentTime); // Update sync time
+
                         } else {
                             console.warn("GAS data format invalid for silent sync.");
                         }
@@ -996,6 +1017,7 @@
                         useGasForLink: true, // FIX: Always save as true since manual option is removed
                         gasWebAppUrl: gasWebAppUrl,
                         masterLinkC1: masterLinkC1
+                        // lastGasSyncTime is updated only during sync process
                     }, { merge: true });
                     setShowSettings(false);
                     showToastFn("บันทึกการตั้งค่าเรียบร้อย", 'success');
@@ -1287,7 +1309,7 @@
                                     {waitingQueues.slice(0, 7).map((q) => (
                                         <div key={q.id} className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-xl shadow-sm">
                                             <div className="flex items-center gap-4 w-full">
-                                                <div className="w-24 h-16 bg-slate-100 rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-2xl text-slate-600 whitespace-nowrap">{q.number}</div>
+                                                <div className="w-14 h-14 bg-slate-100 rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-xl text-slate-600 whitespace-nowrap">{q.number}</div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="font-bold text-slate-800 text-xl truncate">{q.name}</div>
                                                     <div className="text-sm text-slate-400 flex items-center gap-2"><span>Waiting</span><span>• {q.timestamp}</span></div>
@@ -1606,33 +1628,20 @@
                                         {externalLinkEnabled && (
                                             <div className="mt-4 space-y-4 border-t border-slate-200 pt-4 animate-fade-in">
                                                 
-                                                {/* 1. GAS Web App URL (Only relevant field for linking data) */}
+                                                {/* --- 1. NEW C1 LINK INPUT (MOVED TO TOP) --- */}
                                                 <div>
-                                                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1 flex items-center gap-1"><Icons.GoogleScript size={12}/> Google Apps Script URL (Web App) (อ่าน/ส่ง)</label>
-                                                    <input 
-                                                        type="text" 
-                                                        value={gasWebAppUrl || ''} 
-                                                        onChange={e => setGasWebAppUrl(e.target.value)} 
-                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                                                        placeholder="https://script.google.com/..." 
-                                                    />
-                                                    <p className="text-[10px] text-slate-400 mt-1">ใช้สำหรับดึงลิ้งค์ (A-B) และส่งลิ้งค์ (C1)</p>
-                                                </div>
-
-                                                {/* --- NEW C1 LINK INPUT --- */}
-                                                <div>
-                                                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">ลิ้งค์ Google Drive (ส่งไป C1)</label>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">ลิ้งค์</label>
                                                     <div className="flex gap-2">
                                                         <input 
                                                             type="url" 
                                                             value={masterLinkC1 || ''} 
                                                             onChange={e => setMasterLinkC1(e.target.value)} 
                                                             className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500" 
-                                                            placeholder="https://drive.google.com/..." 
+                                                            placeholder="เช่น https://drive.google.com/..." 
                                                         />
                                                         
                                                         {/* Conditional Send Button */}
-                                                        {masterLinkC1 && masterLinkC1.includes('drive.google.com/drive') && (
+                                                        {isGoogleDriveLink(masterLinkC1) && (
                                                             <button 
                                                                 onClick={() => handleSaveToGAS(masterLinkC1)}
                                                                 className="flex-shrink-0 bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg text-xs font-bold transition-colors"
@@ -1641,12 +1650,26 @@
                                                             </button>
                                                         )}
                                                     </div>
-                                                    <p className="text-[10px] text-slate-400 mt-1">ปุ่ม 'ส่งลิ้งค์' จะแสดงเมื่อเป็นลิ้งค์ Google Drive เท่านั้น</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1">ลิ้งค์นี้จะถูกส่งไปที่คอลัมน์ C1 ใน Google Sheet (หากระบุ GAS URL)</p>
                                                 </div>
                                                 {/* --- END NEW C1 LINK INPUT --- */}
+                                                
+                                                {/* 2. GAS Web App URL (Conditional Visibility) */}
+                                                {isGoogleDriveLink(masterLinkC1) && (
+                                                    <div className="animate-fade-in">
+                                                        <label className="block text-xs font-bold text-slate-500 mb-1 ml-1 flex items-center gap-1"><Icons.GoogleScript size={12}/> Google Apps Script URL (Web App) (อ่าน/ส่ง)</label>
+                                                        <input 
+                                                            type="text" 
+                                                            value={gasWebAppUrl || ''} 
+                                                            onChange={e => setGasWebAppUrl(e.target.value)} 
+                                                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
+                                                            placeholder="https://script.google.com/..." 
+                                                        />
+                                                        <p className="text-[10px] text-slate-400 mt-1">ใช้สำหรับดึงลิ้งค์ (A-B) และส่งลิ้งค์ (C1)</p>
+                                                    </div>
+                                                )}
 
-
-                                                {/* 2. Link Button Label */}
+                                                {/* 3. Link Button Label */}
                                                 <div>
                                                     <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">ข้อความบนปุ่มลิ้งค์</label>
                                                     <input 
@@ -1658,7 +1681,7 @@
                                                     />
                                                 </div>
 
-                                                {/* 3. Link Test (Keep the test functionality) */}
+                                                {/* 4. Link Test (Keep the test functionality) */}
                                                 <div className="flex gap-2 items-center">
                                                     <input 
                                                         type="text" 
@@ -1679,7 +1702,6 @@
                                                 <div className="bg-white p-3 rounded-xl border border-slate-200 text-center space-y-2">
                                                     <div className="flex items-center justify-center gap-2">
                                                         <h4 className="text-sm font-bold text-indigo-700 flex items-center gap-2">
-                                                            {/* FIX: Remove redundant animate-spin from h4 */}
                                                             สถานะการอ่านลิ้งค์จาก Sheet (A-B)
                                                         </h4>
                                                         {/* Icon for Sync Status */}
@@ -1697,8 +1719,13 @@
                                                             </button>
                                                         )}
                                                     </div>
+                                                    
+                                                    {/* NEW: Display Last Sync Time */}
                                                     <p className="text-xs text-slate-600">
-                                                        ระบบจะดึงข้อมูลอัตโนมัติทุก <span className="font-bold text-indigo-600">5 วินาที</span> (ไม่ต้องกดเอง)
+                                                        ดึงข้อมูลล่าสุด: <span className={`font-bold ${lastGasSyncTime ? 'text-green-600' : 'text-red-500'}`}>{formatTime(lastGasSyncTime)}</span>
+                                                    </p>
+                                                    <p className="text-xs text-slate-600">
+                                                        ระบบจะดึงข้อมูลอัตโนมัติทุก <span className="font-bold text-indigo-600">5 วินาที</span>
                                                     </p>
                                                     <div className="text-[10px] text-slate-400 font-mono h-12 overflow-hidden whitespace-pre-wrap border border-slate-100 bg-slate-50 p-1 rounded-md mx-auto max-w-full text-left">
                                                         {externalLinkMapping.substring(0, 100) || 'รอการดึงข้อมูล...'}
@@ -1731,6 +1758,9 @@
                                 </div>
                                 
                                 <div className="flex-1 overflow-y-auto p-6">
+                                    <div className="text-sm text-slate-500 mb-4">
+                                        ดึงข้อมูลล่าสุดเมื่อ: <span className={`font-bold ${lastGasSyncTime ? 'text-green-600' : 'text-red-500'}`}>{formatTime(lastGasSyncTime)}</span>
+                                    </div>
                                     {externalLinkMapping ? (
                                         <table className="min-w-full divide-y divide-slate-200">
                                             <thead>
