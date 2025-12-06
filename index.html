@@ -500,6 +500,7 @@
                         setExternalLinkMapping(prev => {
                             if (prev !== mappingString && isManualSync) {
                                 // Only show success toast if data actually changed during manual sync
+                                console.log("GAS mapping silently updated.");
                                 showToastFn("อัปเดตข้อมูลจาก GAS เรียบร้อยแล้ว", "success");
                             }
                             return mappingString;
@@ -1018,13 +1019,15 @@
             };
 
             const confirmCloseService = () => {
-                setClosedReason(tempClosedReason || 'ปิดให้บริการ');
+                // FIXED: ใช้ค่าเริ่มต้น "ปิดให้บริการชั่วคราว" หาก tempClosedReason ว่าง
+                const reason = tempClosedReason.trim() === '' ? 'ปิดให้บริการชั่วคราว' : tempClosedReason.trim();
+                setClosedReason(reason);
                 setServiceOpen(false);
                 setShowCloseReasonModal(false);
                 // Auto save
                 if (user && services) {
                     let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
-                    docRef.set({ serviceOpen: false, closedReason: tempClosedReason || 'ปิดให้บริการ' }, { merge: true });
+                    docRef.set({ serviceOpen: false, closedReason: reason }, { merge: true });
                 }
             };
             
@@ -1134,6 +1137,7 @@
                                             </button>
                                             <div className="text-center text-slate-400 text-sm">รออยู่ <span className="text-indigo-600 font-bold">{queues.filter(q => q.status === 'waiting').length}</span> คิว</div>
                                             
+                                            {/* FIXED: อนุญาตให้ดูประวัติได้แม้เปิดให้บริการ */}
                                             {historyEnabled && (
                                                 <button type="button" onClick={() => setShowMyHistory(true)} className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-indigo-600 mt-4 text-sm font-bold transition-colors">
                                                     <Icons.History size={16}/> ประวัติการจองของฉัน
@@ -1149,6 +1153,13 @@
                                                 <h2 className="2xl font-bold text-slate-800">ปิดให้บริการ</h2>
                                                 <p className="text-slate-500 mt-2 text-lg">{closedReason}</p>
                                             </div>
+                                            
+                                            {/* FIXED: อนุญาตให้ดูประวัติได้แม้ปิดให้บริการ */}
+                                            {historyEnabled && (
+                                                <button type="button" onClick={() => setShowMyHistory(true)} className="flex items-center justify-center gap-2 text-indigo-600 hover:text-indigo-700 mt-4 text-sm font-bold transition-colors underline">
+                                                    <Icons.History size={16}/> ดูประวัติการจอง
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1442,6 +1453,7 @@
                                                 {/* Line 3: Note (Full Width with Divider) */}
                                                 {(q.note || q.skipCount > 0) && (
                                                     // ใช้ flex-shrink-0 เพื่อให้แน่ใจว่าข้อความหมายเหตุจะไม่ถูกบีบ
+                                                    // border-t border-slate-600 เพื่อสร้างเส้นแบ่งจางๆ
                                                     <div className="mt-2 pt-2 border-t border-slate-600 flex-shrink-0"> 
                                                         <span className="text-sm font-bold text-red-400 block break-words">
                                                             {/* FIXED: ใช้ break-words เพื่อให้ข้อความยาว ๆ ขึ้นบรรทัดใหม่ได้ */}
