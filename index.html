@@ -344,10 +344,32 @@
                 };
             }, [viewMode]);
 
+            // --- Handle External Link Smart Logic ---
+            const handleOpenExternalLink = (baseUrl, queueNumber) => {
+                if (!baseUrl) return;
+                
+                // Check if it's a Google Drive Folder Link
+                // Pattern: drive.google.com/drive/folders/FOLDER_ID OR drive.google.com/drive/u/0/folders/FOLDER_ID
+                const drivePattern = /drive\.google\.com\/drive\/.*folders\/([a-zA-Z0-9_-]+)/;
+                const match = baseUrl.match(drivePattern);
+                
+                if (match && match[1]) {
+                    const parentId = match[1];
+                    // Search query: name = 'QUEUE_NUMBER' and 'PARENT_ID' in parents
+                    // NOTE: We use a simple search URL that opens the drive search results
+                    const query = `name = '${queueNumber}' and '${parentId}' in parents`;
+                    const searchUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(query)}`;
+                    window.open(searchUrl, '_blank');
+                } else {
+                    // Default: Append queue number directly (Classic behavior for other sites)
+                    window.open(baseUrl + queueNumber, '_blank');
+                }
+            };
+
             // --- Handle Audio Enable ---
             const handleEnableAudio = () => {
                 initGlobalAudio();
-                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
+                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
                 const audio = new Audio(silentAudio);
                 
                 audio.play().then(() => { 
@@ -853,7 +875,7 @@
                                         {externalLinkEnabled && externalLinkBaseUrl && myQueue.status === 'completed' && (
                                             <div className="pt-2 mt-2 border-t border-slate-200">
                                                 <button 
-                                                    onClick={() => window.open(externalLinkBaseUrl + myQueue.number, '_blank')} 
+                                                    onClick={() => handleOpenExternalLink(externalLinkBaseUrl, myQueue.number)} 
                                                     className="w-full py-3 bg-blue-600 border border-blue-700 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-md animate-bounce-slow"
                                                 >
                                                     <Icons.Folder size={18} /> {externalLinkLabel || 'เปิดเอกสาร / โฟลเดอร์คิว'}
@@ -946,7 +968,7 @@
                                             {externalLinkEnabled && externalLinkBaseUrl && selectedHistoryItem.status === 'completed' && (
                                                 <div className="pt-2 mt-2 border-t border-slate-200">
                                                     <button 
-                                                        onClick={() => window.open(externalLinkBaseUrl + selectedHistoryItem.number, '_blank')} 
+                                                        onClick={() => handleOpenExternalLink(externalLinkBaseUrl, selectedHistoryItem.number)} 
                                                         className="w-full py-3 bg-blue-600 border border-blue-700 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-md animate-bounce-slow"
                                                     >
                                                         <Icons.Folder size={18} /> {externalLinkLabel || 'เปิดเอกสาร / โฟลเดอร์คิว'}
@@ -1359,7 +1381,7 @@
                                                         placeholder="เปิดเอกสาร" 
                                                     />
                                                 </div>
-                                                <p className="text-[10px] text-slate-400">ระบบจะนำเลขคิวไปต่อท้ายลิ้งค์นี้อัตโนมัติ</p>
+                                                <p className="text-[10px] text-slate-400">ระบบจะค้นหาโฟลเดอร์ตามเลขคิวให้โดยอัตโนมัติ (เฉพาะ Google Drive)</p>
                                             </div>
                                         )}
                                     </div>
