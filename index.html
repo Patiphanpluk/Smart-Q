@@ -1181,7 +1181,7 @@
                                             
                                             {/* FIXED: อนุญาตให้ดูประวัติได้แม้ปิดให้บริการ */}
                                             {historyEnabled && (
-                                                <button type="button" onClick={() => setShowMyHistory(true)} className="flex items-center justify-center gap-2 text-indigo-600 hover:text-indigo-700 mt-4 text-sm font-bold transition-colors underline">
+                                                <button type="button" onClick={() => setShowMyHistory(true)} className="w-full flex items-center justify-center gap-2 text-indigo-600 hover:text-indigo-700 mt-4 text-sm font-bold transition-colors underline">
                                                     <Icons.History size={16}/> ดูประวัติการจอง
                                                 </button>
                                             )}
@@ -1805,10 +1805,24 @@
                                                 className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-500" 
                                                 placeholder="เหตุผลการปิดให้บริการ" 
                                             />
-                                            {/* FIXED: เพิ่มปุ่มบันทึกสำหรับเหตุผล */}
-                                            <button onClick={() => handleSaveClosedReason(tempEditClosedReason)} className="w-full bg-red-600 text-white py-2 rounded-lg font-bold hover:bg-red-700 transition-colors text-sm mt-2">
-                                                <Icons.Check size={16} className="inline-block mr-2"/> บันทึกเหตุผล
-                                            </button>
+                                            {/* FIXED: เพิ่มปุ่มบันทึกสำหรับเหตุผล พร้อม Logic สีปุ่ม */}
+                                            {/* ตรวจสอบว่าค่าปัจจุบัน (tempEditClosedReason) แตกต่างจากค่าที่บันทึกใน Firestore (closedReason) หรือไม่ */}
+                                            {(() => {
+                                                const isUnsaved = tempEditClosedReason !== closedReason;
+                                                const buttonClass = isUnsaved 
+                                                    ? 'bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-200' 
+                                                    : 'bg-slate-300 text-slate-600 cursor-default';
+                                                
+                                                return (
+                                                    <button 
+                                                        onClick={() => isUnsaved && handleSaveClosedReason(tempEditClosedReason)} 
+                                                        disabled={!isUnsaved}
+                                                        className={`w-full py-2 rounded-lg font-bold transition-all text-sm mt-2 ${buttonClass}`}
+                                                    >
+                                                        <Icons.Check size={16} className="inline-block mr-2"/> {isUnsaved ? 'บันทึกเหตุผล' : 'บันทึกแล้ว'}
+                                                    </button>
+                                                );
+                                            })()}
                                         </div>
                                     )}
                                     
