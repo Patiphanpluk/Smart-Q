@@ -21,7 +21,7 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Sarabun', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Sarabun', sans-serif; -webkit-tap-highlight-color: transparent; overflow: hidden; } /* Prevent body scroll */
         .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
         .animate-bounce-slow { animation: bounce 2s infinite; }
         .animate-pop-in { animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
@@ -30,12 +30,10 @@
         
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        html, body { overscroll-behavior-y: none; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
-    <div id="root"></div>
+<body class="bg-slate-50 text-slate-900 h-[100dvh] w-screen overflow-hidden">
+    <div id="root" class="h-full w-full"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
@@ -125,7 +123,7 @@
         const playBeepSound = () => {
             if ("vibrate" in navigator) { try { navigator.vibrate([200, 100, 200]); } catch(e){} }
             
-            initGlobalAudio(); // Try to init if not already
+            initGlobalAudio(); 
             
             if (!globalAudioContext) return;
 
@@ -173,8 +171,8 @@
                     if (customerName) spokenText += " คุณ" + customerName;
                     spokenText += " เข้ารับบริการ"; 
                 } else {
-                    spokenText = "หมายเลข " + numberText;
-                    spokenText += " ถึงคิวแล้ว";
+                    spokenText = "คิว " + numberText;
+                    spokenText += " ถึงคิวของคุณแล้ว";
                 }
                 const utterance = new SpeechSynthesisUtterance(spokenText);
                 utterance.lang = 'th-TH'; utterance.rate = 0.85; utterance.volume = 1;
@@ -275,8 +273,6 @@
             const [showEditPopup, setShowEditPopup] = useState(null); 
             const [showScanner, setShowScanner] = useState(false); 
             const [showScannedAction, setShowScannedAction] = useState(null); 
-            
-            // Missing State Variables Added Here
             const [showRecallWait, setShowRecallWait] = useState(false); 
             const [recallCountdown, setRecallCountdown] = useState(0);
             
@@ -603,31 +599,17 @@
 
             if (viewMode === 'kiosk') {
                 return (
-                    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
+                    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 h-[100dvh] overflow-hidden">
                         <Toast message={toast.message} type={toast.type} show={toast.show} />
                         <div className="absolute top-4 text-slate-400 text-sm font-bold tracking-widest uppercase">Q-Master Kiosk</div>
                         
-                        {/* Audio Enable Overlay for Kiosk if not active */}
-                        {!audioEnabled && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-6" onClick={handleEnableAudio}>
-                                <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-sm text-center animate-bounce-slow cursor-pointer">
-                                    <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600">
-                                        <Icons.Volume size={40} />
-                                    </div>
-                                    <h2 className="text-2xl font-bold text-slate-800 mb-2">เปิดใช้งานเสียง</h2>
-                                    <p className="text-slate-500 mb-6">กรุณาแตะที่หน้าจอ 1 ครั้ง<br/>เพื่อเปิดระบบเสียงแจ้งเตือน</p>
-                                    <button className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-300">แตะเพื่อเริ่มใช้งาน</button>
-                                </div>
-                            </div>
-                        )}
-
                         {(!myQueue || myQueue.status === 'completed' || myQueue.status === 'cancelled') ? (
-                            <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in">
-                                <div className="bg-indigo-600 p-8 text-white text-center">
-                                    <h1 className="text-3xl font-bold mb-2">รับบัตรคิว</h1>
-                                    <p className="text-indigo-100">กรอกชื่อเพื่อรับคิว ({queuePrefix})</p>
+                            <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in flex flex-col max-h-[90vh]">
+                                <div className="bg-indigo-600 p-6 text-white text-center">
+                                    <h1 className="text-2xl font-bold mb-2">รับบัตรคิว</h1>
+                                    <p className="text-indigo-100 text-sm">กรอกชื่อเพื่อรับคิว ({queuePrefix})</p>
                                 </div>
-                                <div className="p-8">
+                                <div className="p-6 flex-1 overflow-y-auto">
                                     <form onSubmit={handleBookQueue} className="space-y-6">
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-2">ชื่อของคุณ</label>
@@ -641,22 +623,24 @@
                                 </div>
                             </div>
                         ) : (
-                            <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative">
-                                <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-                                <div className="p-8 text-center space-y-8">
-                                    <div><span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-bold tracking-wide">YOUR QUEUE</span><h1 className="text-6xl sm:text-7xl font-black text-slate-800 mt-4 tracking-tighter">{myQueue.number}</h1></div>
-                                    <div className={`inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold shadow-sm ${myQueue.status === 'waiting' ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600 animate-pulse'}`}>
+                            <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative flex flex-col max-h-[90vh]">
+                                <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-500 flex-shrink-0"></div>
+                                <div className="p-6 text-center space-y-4 flex-1 overflow-y-auto flex flex-col">
+                                    <div className="flex-shrink-0"><span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-bold tracking-wide">YOUR QUEUE</span><h1 className="text-6xl sm:text-7xl font-black text-slate-800 mt-4 tracking-tighter">{myQueue.number}</h1></div>
+                                    
+                                    <div className={`flex-shrink-0 inline-flex items-center justify-center gap-2 px-6 py-2 rounded-full font-bold shadow-sm mx-auto w-fit ${myQueue.status === 'waiting' ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600 animate-pulse'}`}>
                                         {myQueue.status === 'waiting' ? <><Icons.Clock size={20}/> กำลังรอเรียก...</> : <><Icons.Volume size={20}/> ถึงคิวคุณแล้ว!</>}
                                     </div>
-                                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 space-y-4">
-                                        <div className="flex justify-between items-end border-b border-slate-200 pb-3">
+
+                                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2 flex-shrink-0">
+                                        <div className="flex justify-between items-end border-b border-slate-200 pb-2">
                                             <div className="text-left">
                                                 <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">คิวปัจจุบัน</div>
-                                                <div className="text-3xl font-black text-indigo-600 leading-none">{currentServing ? currentServing.number : '--'}</div>
+                                                <div className="text-2xl font-black text-indigo-600 leading-none">{currentServing ? currentServing.number : '--'}</div>
                                             </div>
                                             <div className="text-right">
                                                 <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">รออีก (คิว)</div>
-                                                <div className="text-3xl font-black text-slate-700 leading-none">{queues.filter(q => q.status === 'waiting' && q.createdAt < myQueue.createdAt).length}</div>
+                                                <div className="text-2xl font-black text-slate-700 leading-none">{queues.filter(q => q.status === 'waiting' && q.createdAt < myQueue.createdAt).length}</div>
                                             </div>
                                         </div>
                                         <div className="flex justify-between items-center text-sm pt-1">
@@ -667,13 +651,26 @@
                                         {/* QR Code Display */}
                                         {qrEnabled && (
                                             <div className="flex flex-col items-center border-t border-slate-100 pt-4 mt-2">
-                                                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${myQueue.id}`} alt="QR Code" className="w-32 h-32" />
-                                                <p className="text-xs text-slate-400 mt-2">สแกนเพื่อตรวจสอบ/จัดการ</p>
+                                                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${myQueue.id}`} alt="QR Code" className="w-24 h-24" />
+                                                <p className="text-[10px] text-slate-400 mt-1">สแกนเพื่อตรวจสอบ</p>
                                             </div>
                                         )}
                                     </div>
-                                    {myQueue.status === 'serving' && <div className="text-green-600 font-bold animate-bounce-slow text-lg">เชิญเข้ารับบริการครับ</div>}
-                                    <button onClick={() => {localStorage.removeItem('my_queue_id'); setMyQueueId(null);}} className="text-slate-400 text-sm hover:text-slate-600 underline">จองคิวใหม่ / ออกจากหน้านี้</button>
+                                    
+                                    {/* Audio Enable Button (Small) */}
+                                    {!audioEnabled && (
+                                        <button onClick={handleEnableAudio} className="flex-shrink-0 flex items-center justify-center gap-2 w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 py-2 rounded-xl font-bold text-sm transition-colors border border-indigo-200">
+                                            <Icons.Speaker size={16}/> 🔔 เปิดเสียงแจ้งเตือน
+                                        </button>
+                                    )}
+
+                                    <div className="flex-shrink-0 text-xs text-slate-400 bg-yellow-50 p-2 rounded text-center border border-yellow-100">
+                                        ⚠️ กรุณาเปิดหน้านี้ค้างไว้เพื่อรับการแจ้งเตือนเมื่อถึงคิว
+                                    </div>
+
+                                    {myQueue.status === 'serving' && <div className="flex-shrink-0 text-green-600 font-bold animate-bounce-slow text-lg">เชิญเข้ารับบริการครับ</div>}
+                                    
+                                    <button onClick={() => {localStorage.removeItem('my_queue_id'); setMyQueueId(null);}} className="flex-shrink-0 text-slate-400 text-sm hover:text-slate-600 underline mt-auto">จองคิวใหม่ / ออกจากหน้านี้</button>
                                 </div>
                             </div>
                         )}
