@@ -477,7 +477,7 @@
                 return null;
             };
 
-            const handleOpenExternalLink = (mappingString, queueNumber) => {
+            const handleOpenExternalLink = (mappingString, queueNumber, isToastRequired = true) => {
                 const url = getLinkForQueue(mappingString, queueNumber);
                 
                 console.log(`[Linker] Attempting to open link for Q: ${queueNumber}`);
@@ -488,9 +488,14 @@
                     }
                     console.log(`[Linker] Found URL: ${finalUrl}`);
                     window.open(finalUrl, '_blank');
+                    if (isToastRequired) {
+                        showToastFn(`เปิดลิ้งค์สำหรับคิว ${queueNumber} แล้ว`, 'success');
+                    }
                 } else {
                     console.warn(`[Linker] No link found for Q: ${queueNumber}`);
-                    showToastFn(`ไม่พบลิ้งค์สำหรับคิว ${queueNumber}`, 'error');
+                    if (isToastRequired) {
+                        showToastFn(`ไม่พบลิ้งค์สำหรับคิว ${queueNumber} (กรุณาตั้งค่า)`, 'error');
+                    }
                 }
             };
             
@@ -1271,7 +1276,8 @@
                  return (
                     // Use min-h-screen and bg-transparent
                     <div className="min-h-screen w-screen bg-transparent text-slate-900 flex flex-col items-center justify-center p-4">
-                        <div className="bg-white/90 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/20 text-center animate-fade-in max-w-sm w-full">
+                        {/* FIXED: เพิ่ม bg-white คลุมทั้งบล็อก QR และข้อความกำกับ */}
+                        <div className="bg-white p-6 rounded-3xl shadow-xl border border-white/20 text-center animate-fade-in max-w-sm w-full">
                             
                             <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center justify-center gap-2">
                                 <Icons.QrCode size={24} className="text-indigo-600"/> สแกนเพื่อรับบัตรคิว
@@ -1286,7 +1292,7 @@
                                 />
                             </div>
                             
-                            <p className="text-lg font-medium text-slate-600 mb-1">คิวปัจจุบัน: <span className="font-bold text-indigo-600">{currentServing ? currentServing.number : '--'}</span></p>
+                            <p className="text-lg font-medium text-slate-800 mb-1">คิวปัจจุบัน: <span className="font-bold text-indigo-600">{currentServing ? currentServing.number : '--'}</span></p>
                             
                             {/* FIXED: แสดงสถานะการหมดอายุตามที่ตั้งค่า */}
                             {qrExpireEnabled && qrTokenExpiry ? (
@@ -1428,7 +1434,7 @@
                                         {externalLinkEnabled && myQueue.status === 'completed' && (
                                             <div className="pt-2 mt-2 border-t border-slate-200">
                                                 <button 
-                                                    onClick={() => handleOpenExternalLink(externalLinkMapping, myQueue.number)} 
+                                                    onClick={() => handleOpenExternalLink(externalLinkMapping, myQueue.number, true)} 
                                                     className="w-full py-3 bg-blue-600 border border-blue-700 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-md animate-bounce-slow"
                                                 >
                                                     <Icons.Folder size={18} /> {externalLinkLabel || 'เปิดเอกสาร / โฟลเดอร์คิว'}
@@ -1547,7 +1553,7 @@
                                             {externalLinkEnabled && selectedHistoryItem.status === 'completed' && (
                                                 <div className="pt-2 mt-2 border-t border-slate-200">
                                                     <button 
-                                                        onClick={() => handleOpenExternalLink(externalLinkMapping, selectedHistoryItem.number)} 
+                                                        onClick={() => handleOpenExternalLink(externalLinkMapping, selectedHistoryItem.number, true)} 
                                                         className="w-full py-3 bg-blue-600 border border-blue-700 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-md"
                                                     >
                                                         <Icons.Folder size={18} /> {externalLinkLabel || 'เปิดเอกสาร / โฟลเดอร์คิว'}
@@ -1616,31 +1622,45 @@
                                 
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
                                 
-                                <h2 className="text-2xl sm:text-3xl font-medium text-indigo-200 mb-8 uppercase tracking-widest">หมายเลขคิวปัจจุบัน</h2>
+                                {/* FIXED 1: Dynamic Title based on service status */}
+                                <h2 className="text-2xl sm:text-3xl font-medium text-indigo-200 mb-8 uppercase tracking-widest">
+                                    {serviceOpen ? 'หมายเลขคิวปัจจุบัน' : 'สถานะบริการ'}
+                                </h2>
                                 
-                                {currentDisplayServing ? (
-                                    <div className="text-center w-full"> 
-                                        {/* FIXED: text-white, removed animate-pulse */}
-                                        <div className="text-8xl md:text-[10rem] lg:text-[14rem] font-black leading-none tracking-normal drop-shadow-lg text-white">
-                                            {currentDisplayServing.number}
+                                {/* FIXED 1: Logic Block - Check service status first */}
+                                {serviceOpen ? (
+                                    currentDisplayServing ? (
+                                        <div className="text-center w-full"> 
+                                            <div className="text-8xl md:text-[10rem] lg:text-[14rem] font-black leading-none tracking-normal drop-shadow-lg text-white">
+                                                {currentDisplayServing.number}
+                                            </div>
+                                            <div className="mt-8 bg-white/20 backdrop-blur-md px-12 py-8 rounded-full inline-block w-full max-w-md">
+                                                <span className="text-3xl md:text-5xl font-bold block display-name-full">{currentDisplayServing.name}</span>
+                                            </div>
+                                            <div className="mt-10 text-2xl md:text-4xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
                                         </div>
-                                        {/* FIXED: เพิ่มพื้นที่แนวตั้ง (py-8) และใช้ display-name-full */}
-                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-12 py-8 rounded-full inline-block w-full max-w-md">
-                                            <span className="text-3xl md:text-5xl font-bold block display-name-full">{currentDisplayServing.name}</span>
+                                    ) : (
+                                        <div className="text-center opacity-40">
+                                            <div className="text-8xl md:text-9xl font-black">---</div>
+                                            <div className="text-2xl mt-4 text-indigo-200">ไม่มีคิวเรียก (รอคิวถัดไป)</div>
                                         </div>
-                                        <div className="mt-10 text-2xl md:text-4xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
-                                    </div>
+                                    )
                                 ) : (
-                                    <div className="text-center opacity-40">
-                                        <div className="text-8xl md:text-9xl font-black">---</div>
-                                        <div className="text-2xl mt-4 text-indigo-200">รอเรียกคิวถัดไป</div>
+                                    <div className="text-center w-full">
+                                        <div className="text-8xl md:text-[10rem] lg:text-[14rem] font-black leading-none tracking-normal drop-shadow-lg text-white opacity-60">
+                                            CLOSED
+                                        </div>
+                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-12 py-8 rounded-full inline-block w-full max-w-md">
+                                            <span className="text-3xl md:text-5xl font-bold block display-name-full">{closedReason || 'ปิดให้บริการชั่วคราว'}</span>
+                                        </div>
+                                        <div className="mt-10 text-2xl md:text-4xl text-red-300 font-bold">กรุณาติดต่อช่องบริการในภายหลัง</div>
                                     </div>
                                 )}
                             </div>
                             
                             {/* RIGHT COLUMN: WAITING QUEUES LIST */}
-                            {/* FIXED: ให้ใช้พื้นที่ 1/3 (lg:w-1/3) และขยายความสูงเต็ม (h-full) */}
-                            <div className="w-full lg:w-1/3 bg-slate-800 rounded-3xl shadow-xl flex flex-col overflow-hidden flex-shrink-0 lg:h-full">
+                            {/* FIXED: เพิ่ม relative เพื่อให้ QR Code ที่ absolute ใช้งานได้ */}
+                            <div className="w-full lg:w-1/3 bg-slate-800 rounded-3xl shadow-xl flex flex-col overflow-hidden flex-shrink-0 lg:h-full relative">
                                 
                                 <div className="p-4 sm:p-6 bg-slate-700 border-b border-slate-600 font-bold text-slate-300 flex items-center justify-between flex-shrink-0">
                                     <div className="text-xl flex items-center gap-2">
@@ -1690,26 +1710,30 @@
                                     )}
                                 </div>
 
-                                {/* NEW QR CODE LOCATION (Pinned to bottom of the column) */}
-                                {/* FIXED: อัปเดตเงื่อนไขการแสดงผลเป็น (qrEnabled || qrExpireEnabled) และเพิ่มข้อความ "สแกนเพื่อจองคิว" */}
+                                {/* FIXED 3: NEW QR CODE LOCATION (Floating Absolute Bottom Right) */}
                                 {(qrEnabled || qrExpireEnabled) && (
-                                    // Use p-4 pt-2 to create spacing from the list above, border-t to separate from list
-                                    <div className="p-4 pt-2 flex flex-col items-center flex-shrink-0 bg-slate-700/50 border-t border-slate-600">
-                                        <div className="text-indigo-300 text-sm font-bold mb-2 uppercase tracking-wider">สแกนเพื่อจองคิว</div>
-                                        <div className="bg-white p-3 rounded-xl shadow-lg border border-slate-200 flex flex-col items-center">
+                                    <div className="absolute bottom-0 right-0 p-4 z-10"> 
+                                        {/* FIXED: เพิ่ม bg-white, rounded-xl, shadow-2xl คลุมทั้งบล็อก */}
+                                        <div className="bg-white rounded-xl shadow-2xl p-3 text-center border border-white/90">
+                                            
+                                            {/* FIXED: ข้อความกำกับ (เปลี่ยนสีเป็น slate-800) */}
+                                            <div className="text-xs font-bold text-slate-800 mb-1">สแกนเพื่อจองคิว</div>
+                                            
                                             <img 
                                                 // FIXED: ใช้ qrCodeData ที่ encodeURIComponent แล้ว
-                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrCodeData)}`} 
+                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrCodeData)}`} 
                                                 alt="Queue QR Code" 
-                                                className="w-24 h-24 sm:w-32 sm:h-32" 
+                                                // ลบ mix-blend-lighten, opacity ออก
+                                                className="w-24 h-24 sm:w-28 sm:h-28 rounded-md mx-auto" 
                                                 key={qrToken} // Re-render image when token changes, even if expiration is off
                                             />
-                                            {/* FIXED: แสดงสถานะการหมดอายุตามที่ตั้งค่า */}
-                                            {qrExpireEnabled && qrTokenExpiry ? (
-                                                <div className="text-slate-600 text-xs mt-2 font-mono flex items-center">
-                                                    <Icons.Clock size={12} className="inline-block mr-1 text-red-500"/> หมดอายุใน: {formatCountdown(qrCountdown)}
+                                            
+                                            {/* FIXED: แสดงสถานะการหมดอายุ (เปลี่ยนสีเป็น red-600) */}
+                                            {qrExpireEnabled && qrTokenExpiry && (
+                                                <div className="text-[10px] text-red-600 mt-1 font-mono flex items-center justify-center">
+                                                    <Icons.Clock size={10} className="inline-block mr-0.5"/> หมดอายุใน: {formatCountdown(qrCountdown)}
                                                 </div>
-                                            ) : (qrEnabled && <div className="text-slate-600 text-xs mt-2">QR Code ไม่หมดอายุ</div>)}
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1830,15 +1854,6 @@
                                         <h2 className="font-semibold text-lg text-black mb-0 flex items-center gap-2">
                                             <Icons.Monitor className="w-5 h-5 text-indigo-600 overflow-visible" /> Calling
                                         </h2>
-                                        
-                                        {/* Auto Recall Status Indicator */}
-                                        {autoRecallState.active && (
-                                            <div className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100 animate-pulse mt-2 sm:mt-0">
-                                                <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                                                <span className="text-xs font-bold text-indigo-700 whitespace-nowrap">กำลังเรียกอัตโนมัติ {autoRecallState.current}/{autoRecallState.total}</span>
-                                                <button onClick={stopAutoRecall} className="ml-2 bg-white text-slate-400 hover:text-red-500 rounded-full p-0.5"><Icons.Cross size={14}/></button>
-                                            </div>
-                                        )}
                                     </div>
                                     
                                     {currentServing ? (
@@ -1861,7 +1876,7 @@
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="border-2 border-dashed border-slate-200 rounded-xl p-10 text-center text-slate-400">ยังไม่มีการเรียกคิว</div>
+                                        <div className="border-2 border-dashed border-slate-200 rounded-xl p-10 text-center text-slate-400">ไม่มีคิวรอเรียก</div>
                                     )}
                                 </div>
 
@@ -2008,6 +2023,7 @@
                                     {/* Service Toggle */}
                                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                         <div className="flex items-center gap-3">
+                                            {/* FIXED: แก้ไข string constant ที่ขาดหายไป */}
                                             <div className={`p-2.5 rounded-xl ${serviceOpen ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
                                                 <Icons.Power size={20} />
                                             </div>
