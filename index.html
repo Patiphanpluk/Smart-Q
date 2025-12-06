@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Q-Master Queue System</title>
+    <title>Q-Master Queue System (GAS Integrated)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -130,7 +130,8 @@
             Folder: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
             Search: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
             Sheet: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
-            Sync: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M21.5 2v6h-6M21.34 5.5A10 10 0 1 0 22 12M2.5 22v-6h6M2.66 18.5A10 10 0 1 0 2 12"/></svg>
+            Sync: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M21.5 2v6h-6M21.34 5.5A10 10 0 1 0 22 12M2.5 22v-6h6M2.66 18.5A10 10 0 1 0 2 12"/></svg>,
+            GoogleScript: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
         };
 
         // --- UI Components ---
@@ -300,9 +301,13 @@
             const [historyEnabled, setHistoryEnabled] = useState(false); 
             const [externalLinkEnabled, setExternalLinkEnabled] = useState(false); 
             const [externalLinkMapping, setExternalLinkMapping] = useState(''); 
-            const [externalLinkSheetId, setExternalLinkSheetId] = useState(''); 
+            
+            // GAS Integration State
+            const [gasWebAppUrl, setGasWebAppUrl] = useState('https://script.google.com/macros/s/AKfycbyHQ4b_69fLsfIV2rh8EMIkE3s3KlZVTz6im2btIAsvVAQJWJ5N6OrjO6sfLtNtSjykaQ/exec'); 
+            const [masterLinkC1, setMasterLinkC1] = useState(''); 
+            
             const [externalLinkLabel, setExternalLinkLabel] = useState('เปิดเอกสาร / โฟลเดอร์คิว'); 
-            const [useSheetForLink, setUseSheetForLink] = useState(false); 
+            const [useGasForLink, setUseGasForLink] = useState(false); // Changed from useSheet to useGas
             const [testQueueId, setTestQueueId] = useState(''); 
             
             const [showSettings, setShowSettings] = useState(false);
@@ -423,44 +428,94 @@
                 }
             };
 
-            const handleSyncSheet = async () => {
-                if (!externalLinkSheetId) {
-                    showToastFn("กรุณาระบุ Sheet ID", "error");
+            // --- GAS Integration Functions ---
+
+            // 1. Sync Data from GAS (Read A, B)
+            const handleSyncGAS = async () => {
+                if (!gasWebAppUrl) {
+                    showToastFn("กรุณาระบุ GAS Web App URL", "error");
                     return;
                 }
                 
                 try {
-                    showToastFn("กำลังดึงข้อมูล...", "success");
-                    const response = await fetch(`https://docs.google.com/spreadsheets/d/${externalLinkSheetId}/export?format=csv&gid=0`);
-                    if (!response.ok) throw new Error("ไม่สามารถดึงข้อมูลได้ ตรวจสอบ Sheet ID และสิทธิ์การเข้าถึง (ต้องเป็น Public)");
+                    showToastFn("กำลังดึงข้อมูลจาก GAS...", "success");
+                    // GAS doGet returns JSON: [[A1, B1], [A2, B2], ...]
+                    const response = await fetch(gasWebAppUrl);
+                    if (!response.ok) throw new Error("ไม่สามารถเชื่อมต่อ GAS ได้");
                     
-                    const csvText = await response.text();
-                    const rows = csvText.split('\n').map(row => {
-                        const cells = row.split(',');
-                        if (cells.length >= 2) {
-                            return `${cells[0].trim()},${cells[1].trim()}`;
-                        }
-                        return null;
-                    }).filter(Boolean).join('\n');
+                    const json = await response.json();
+                    
+                    // Convert Array to String Format (Key, Link)
+                    if (Array.isArray(json)) {
+                        const mappingString = json.map(row => {
+                             if (Array.isArray(row) && row.length >= 2) {
+                                 return `${row[0]},${row[1]}`;
+                             }
+                             return null;
+                        }).filter(Boolean).join('\n');
 
-                    setExternalLinkMapping(rows);
-                    showToastFn("อัปเดตข้อมูลจาก Sheet เรียบร้อยแล้ว", "success");
-                    
-                    // Auto save after sync
-                    if (user && services) {
-                        let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
-                        await docRef.set({ externalLinkMapping: rows }, { merge: true });
+                        setExternalLinkMapping(mappingString);
+                        showToastFn("อัปเดตข้อมูลจาก GAS เรียบร้อยแล้ว", "success");
+                        
+                        // Auto save
+                        if (user && services) {
+                            let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
+                            await docRef.set({ externalLinkMapping: mappingString }, { merge: true });
+                        }
+                    } else {
+                        throw new Error("รูปแบบข้อมูลจาก GAS ไม่ถูกต้อง");
                     }
                     
                 } catch (error) {
                     showToastFn("Error: " + error.message, "error");
+                    console.error(error);
+                }
+            };
+
+            // 2. Save Master Link to GAS (Write C1)
+            const handleSaveToGAS = async () => {
+                if (!gasWebAppUrl) {
+                    showToastFn("กรุณาระบุ GAS Web App URL", "error");
+                    return;
+                }
+                
+                try {
+                    showToastFn("กำลังส่งข้อมูลไป GAS (C1)...", "success");
+                    
+                    // Send as text/plain to avoid CORS preflight issues with GAS
+                    const payload = { link: masterLinkC1 };
+                    
+                    const response = await fetch(gasWebAppUrl, {
+                        method: 'POST',
+                        body: JSON.stringify(payload),
+                        headers: {
+                            'Content-Type': 'text/plain;charset=utf-8', 
+                        }
+                    });
+
+                    // GAS response might be opaque in no-cors, but we try standard first
+                    const text = await response.text();
+                    
+                    if (text.includes("Success")) {
+                        showToastFn("บันทึกข้อมูลลง C1 เรียบร้อย", "success");
+                         // Auto save locally
+                        if (user && services) {
+                            let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
+                            await docRef.set({ masterLinkC1: masterLinkC1 }, { merge: true });
+                        }
+                    } else {
+                        showToastFn("เกิดข้อผิดพลาด: " + text, "error");
+                    }
+                } catch (error) {
+                    showToastFn("Error: " + error.message, "error");
+                    console.error(error);
                 }
             };
 
             // --- Handle Audio Enable ---
             const handleEnableAudio = () => {
                 initGlobalAudio();
-                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
+                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
                 const audio = new Audio(silentAudio);
                 
                 audio.play().then(() => { 
@@ -597,8 +652,9 @@
                         if (data.externalLinkEnabled !== undefined) setExternalLinkEnabled(data.externalLinkEnabled);
                         if (data.externalLinkMapping !== undefined) setExternalLinkMapping(data.externalLinkMapping);
                         if (data.externalLinkLabel !== undefined) setExternalLinkLabel(data.externalLinkLabel);
-                        if (data.useSheetForLink !== undefined) setUseSheetForLink(data.useSheetForLink);
-                        if (data.externalLinkSheetId !== undefined) setExternalLinkSheetId(data.externalLinkSheetId);
+                        if (data.useGasForLink !== undefined) setUseGasForLink(data.useGasForLink);
+                        if (data.gasWebAppUrl !== undefined) setGasWebAppUrl(data.gasWebAppUrl);
+                        if (data.masterLinkC1 !== undefined) setMasterLinkC1(data.masterLinkC1);
                     }
                 }, err => console.log("Settings sync skipped"));
                 return () => { unsubQueues(); unsubSettings(); };
@@ -817,6 +873,33 @@
                 } catch (err) { showToastFn("Error clearing: " + err.message, 'error'); }
             };
 
+            const confirmCloseService = () => {
+                setClosedReason(tempClosedReason || 'ปิดให้บริการ');
+                setServiceOpen(false);
+                setShowCloseReasonModal(false);
+                // Auto save
+                if (user && services) {
+                    let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
+                    docRef.set({ serviceOpen: false, closedReason: tempClosedReason || 'ปิดให้บริการ' }, { merge: true });
+                }
+            };
+            
+            const handleServiceToggle = () => {
+                if (serviceOpen) {
+                    // Currently Open -> Want to Close
+                    setTempClosedReason('');
+                    setShowCloseReasonModal(true);
+                } else {
+                    // Currently Closed -> Want to Open
+                    setServiceOpen(true);
+                    // Auto save
+                    if (user && services) {
+                        let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
+                        docRef.set({ serviceOpen: true }, { merge: true });
+                    }
+                }
+            };
+
             const handleSaveSettings = async () => {
                 if (!user || !services) return;
                 try {
@@ -828,8 +911,9 @@
                         externalLinkEnabled: externalLinkEnabled,
                         externalLinkMapping: externalLinkMapping,
                         externalLinkLabel: externalLinkLabel,
-                        useSheetForLink: useSheetForLink,
-                        externalLinkSheetId: externalLinkSheetId
+                        useGasForLink: useGasForLink,
+                        gasWebAppUrl: gasWebAppUrl,
+                        masterLinkC1: masterLinkC1
                     }, { merge: true });
                     setShowSettings(false);
                     showToastFn("บันทึกการตั้งค่าเรียบร้อย", 'success');
@@ -853,7 +937,6 @@
 
             if (viewMode === 'kiosk') {
                 return (
-                    // Center Alignment Fix: Changed to h-[100dvh] and overflow-hidden to prevent scrolling as requested
                     <div className="h-[100dvh] w-screen bg-slate-100 flex flex-col overflow-hidden fixed inset-0">
                         <Toast message={toast.message} type={toast.type} show={toast.show} />
                         
@@ -1441,38 +1524,61 @@
                                             <div className="mt-4 space-y-4 border-t border-slate-200 pt-4 animate-fade-in">
                                                 <div className="flex bg-slate-100 rounded-xl p-1 mb-3">
                                                     <button 
-                                                        onClick={() => setUseSheetForLink(false)}
-                                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!useSheetForLink ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                                        onClick={() => setUseGasForLink(false)}
+                                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!useGasForLink ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
                                                     >
                                                         กำหนดเอง
                                                     </button>
                                                     <button 
-                                                        onClick={() => setUseSheetForLink(true)}
-                                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${useSheetForLink ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                                        onClick={() => setUseGasForLink(true)}
+                                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${useGasForLink ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
                                                     >
-                                                        Google Sheet
+                                                        Google Sheet (GAS)
                                                     </button>
                                                 </div>
 
-                                                {useSheetForLink ? (
-                                                    <div className="space-y-2">
+                                                {useGasForLink ? (
+                                                    <div className="space-y-4">
                                                         <div>
-                                                            <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">Google Sheet ID</label>
+                                                            <label className="block text-xs font-bold text-slate-500 mb-1 ml-1 flex items-center gap-1"><Icons.GoogleScript size={12}/> Google Apps Script URL (Web App)</label>
                                                             <input 
                                                                 type="text" 
-                                                                value={externalLinkSheetId || ''} 
-                                                                onChange={e => setExternalLinkSheetId(e.target.value)} 
+                                                                value={gasWebAppUrl || ''} 
+                                                                onChange={e => setGasWebAppUrl(e.target.value)} 
                                                                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                                                                placeholder="เช่น 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvEBrniA" 
+                                                                placeholder="https://script.google.com/..." 
                                                             />
-                                                            <p className="text-[10px] text-slate-400 mt-1">Sheet ต้องตั้งค่าแชร์เป็น "ทุกคนที่มีลิงก์" (Anyone with the link)</p>
                                                         </div>
-                                                        <button 
-                                                            onClick={handleSyncSheet}
-                                                            className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-2 rounded-xl text-xs font-bold transition-colors shadow-sm"
-                                                        >
-                                                            <Icons.Sync size={14} className="animate-spin-slow" /> อัปเดตข้อมูลจาก Sheet
-                                                        </button>
+                                                        
+                                                        <div className="bg-white p-3 rounded-xl border border-slate-200">
+                                                             <h4 className="text-xs font-bold text-slate-700 mb-2">1. อ่านลิ้งค์จาก Sheet (A-B)</h4>
+                                                             <button 
+                                                                onClick={handleSyncGAS}
+                                                                className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                                                            >
+                                                                <Icons.Sync size={14}/> ดึงข้อมูลคอลัมน์ A, B
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="bg-white p-3 rounded-xl border border-slate-200">
+                                                             <h4 className="text-xs font-bold text-slate-700 mb-2">2. เขียนลิ้งค์ลง Sheet (C1)</h4>
+                                                             <div className="flex gap-2">
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={masterLinkC1 || ''} 
+                                                                    onChange={e => setMasterLinkC1(e.target.value)} 
+                                                                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none" 
+                                                                    placeholder="ใส่ลิ้งค์ที่ต้องการบันทึก" 
+                                                                />
+                                                                 <button 
+                                                                    onClick={handleSaveToGAS}
+                                                                    className="px-4 bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg text-xs font-bold transition-colors shadow-sm whitespace-nowrap"
+                                                                >
+                                                                    บันทึก
+                                                                </button>
+                                                             </div>
+                                                        </div>
+
                                                     </div>
                                                 ) : (
                                                     <div>
@@ -1512,10 +1618,6 @@
                                                         className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
                                                         placeholder="เปิดเอกสาร" 
                                                     />
-                                                </div>
-                                                <div className="bg-blue-50 p-3 rounded-xl flex gap-2 text-[10px] text-blue-600 border border-blue-100">
-                                                    <div className="flex-shrink-0 mt-0.5">ℹ️</div>
-                                                    <div>ระบบจะเปิดลิ้งค์ตามที่ระบุในตารางเมื่อลูกค้ากดปุ่ม</div>
                                                 </div>
                                             </div>
                                         )}
