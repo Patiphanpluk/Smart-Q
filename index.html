@@ -110,7 +110,7 @@
         const Icons = {
             User: (p) => <Icon d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M12 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8" {...p} />,
             // แก้ไข Icons.Monitor เพื่อให้ใส่ overflow-visible ได้
-            Monitor: (p) => <svg xmlns="http://www.w3.org/24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${p.className} ${p.overflowVisible ? 'overflow-visible' : ''}`}><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>,
+            Monitor: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${p.className} ${p.overflowVisible ? 'overflow-visible' : ''}`}><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>,
             Bell: (p) => <Icon d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9 M10.3 21a1.94 1.94 0 0 0 3.4 0" {...p} />,
             // FIXED: แก้ไข SyntaxError: Unterminated string constant.
             Check: (p) => <Icon d="M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4 12 14.01l-3-3" {...p} />,
@@ -733,6 +733,8 @@
                     const mode = params.get('mode');
                     if (mode === 'kiosk') setViewMode('kiosk');
                     if (mode === 'display') setViewMode('display');
+                    // NEW: Add QR-only mode
+                    if (mode === 'qr-only') setViewMode('qr-only');
                     return () => unsubAuth();
                 } catch (err) { setErrorMsg(err.message); setConfigError(true); setLoading(false); }
             }, []);
@@ -933,6 +935,7 @@
                 const kioskToken = params.get('queue_token');
                 
                 if (qrExpireEnabled) {
+                     // Check if token is present, if it matches the current token, and if it has not expired
                      if (!kioskToken || kioskToken !== qrToken || (qrTokenExpiry && Date.now() > qrTokenExpiry)) {
                          showToastFn("QR Code หมดอายุแล้ว กรุณาสแกนใหม่", 'error');
                          setCustomerName('');
@@ -1223,6 +1226,20 @@
                 window.open(url.toString(), '_blank'); 
             };
 
+            const openQROnlyLink = () => { 
+                const url = new URL(window.location.href); 
+                url.searchParams.set('mode', 'qr-only'); 
+                
+                // Add token if expiration is enabled and token exists
+                if(qrExpireEnabled && qrToken) {
+                    url.searchParams.set('queue_token', qrToken);
+                } else {
+                    url.searchParams.delete('queue_token');
+                }
+                
+                window.open(url.toString(), '_blank'); 
+            };
+
             const waitingQueues = queues.filter(q => q.status === 'waiting');
             const currentServing = queues.find(q => q.status === 'serving');
             const myQueue = queues.find(q => q.id === myQueueId);
@@ -1235,6 +1252,55 @@
             if (loading) return <div className="h-screen flex items-center justify-center text-slate-400">กำลังเชื่อมต่อระบบ...</div>;
 
             if (viewMode === 'admin' && !isAdminAuthenticated) return <AdminLogin onLogin={() => setIsAdminAuthenticated(true)} />;
+
+            // Generate full QR Code URL for Display Mode (and QR Only Mode)
+            const kioskUrl = new URL(window.location.href);
+            kioskUrl.search = '';
+            kioskUrl.searchParams.set('mode', 'kiosk');
+            if(qrExpireEnabled && qrToken) {
+                 kioskUrl.searchParams.set('queue_token', qrToken);
+            }
+            // The URL used for the QR code image generation
+            const qrCodeData = kioskUrl.toString(); 
+
+            // ===============================================
+            // NEW: QR-ONLY MODE LOGIC (FOR EMBEDDING)
+            // ===============================================
+            if (viewMode === 'qr-only') {
+                 // The main container must be transparent to allow embedding with minimal fuss
+                 return (
+                    // Use min-h-screen and bg-transparent
+                    <div className="min-h-screen w-screen bg-transparent text-slate-900 flex flex-col items-center justify-center p-4">
+                        <div className="bg-white/90 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/20 text-center animate-fade-in max-w-sm w-full">
+                            
+                            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center justify-center gap-2">
+                                <Icons.QrCode size={24} className="text-indigo-600"/> สแกนเพื่อรับบัตรคิว
+                            </h2>
+
+                            <div className="bg-slate-100 p-4 rounded-xl inline-block mb-4">
+                                <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeData)}`} 
+                                    alt="Queue QR Code" 
+                                    className="w-48 h-48 sm:w-64 sm:h-64" 
+                                    key={qrToken}
+                                />
+                            </div>
+                            
+                            <p className="text-lg font-medium text-slate-600 mb-1">คิวปัจจุบัน: <span className="font-bold text-indigo-600">{currentServing ? currentServing.number : '--'}</span></p>
+                            
+                            {/* FIXED: แสดงสถานะการหมดอายุตามที่ตั้งค่า */}
+                            {qrExpireEnabled && qrTokenExpiry ? (
+                                <div className="text-sm font-bold text-red-500 mt-2 flex items-center justify-center">
+                                    <Icons.Clock size={16} className="inline-block mr-1"/> QR Code เปลี่ยนใหม่ใน: {formatCountdown(qrCountdown)}
+                                </div>
+                            ) : (qrEnabled && <div className="text-sm text-slate-500 mt-2">QR Code ไม่หมดอายุ (คงที่)</div>)}
+                            
+                            <div className="text-xs text-slate-400 mt-4">Powered by Q-Master System</div>
+
+                        </div>
+                    </div>
+                );
+            }
 
             if (viewMode === 'kiosk') {
                 return (
@@ -1264,10 +1330,6 @@
                            </div>
                         )}
 
-                        {/* Q-Master Kiosk (ถูกลบออกตามคำขอ) 
-                        <div className="p-4 text-center text-slate-400 text-sm font-bold tracking-widest uppercase flex-shrink-0">Q-Master Kiosk</div>
-                        */}
-                        
                         {/* Center content wrapper */}
                         <div className="flex-1 flex flex-col items-center justify-center p-4 w-full relative z-0">
                         {(!myQueue || myQueue.status === 'cancelled') ? (
@@ -1319,6 +1381,7 @@
                         ) : (
                             <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative flex flex-col max-h-[90vh]">
                                 <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-500 flex-shrink-0"></div>
+                                <button onClick={() => {if(myQueue?.status !== 'serving') {localStorage.removeItem('my_queue_id'); setMyQueueId(null);}}} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-10"><Icons.Cross size={24}/></button>
                                 <div className="p-6 text-center space-y-4 flex-1 overflow-y-auto flex flex-col justify-center">
                                     <div className="flex-shrink-0"><span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-bold tracking-wide">YOUR QUEUE</span><h1 className="text-6xl sm:text-7xl font-black text-slate-800 mt-4 tracking-tighter">{myQueue.number}</h1></div>
                                     
@@ -1525,17 +1588,8 @@
             const currentDisplayServing = displayQueues.find(q => q.status === 'serving');
             const waitingForDisplay = displayQueues.filter(q => q.status === 'waiting').sort((a, b) => a.createdAt - b.createdAt).slice(0, 7); // Show max 7 waiting queues
             
-            // Generate full QR Code URL for Display Mode
-            const kioskUrl = new URL(window.location.href);
-            // FIXED: ต้องลบ search params ออกก่อน เพื่อให้ QR code สะอาด
-            kioskUrl.search = '';
-            kioskUrl.searchParams.set('mode', 'kiosk');
-            if(qrExpireEnabled && qrToken) {
-                 kioskUrl.searchParams.set('queue_token', qrToken);
-            }
-            // FIXED: ใช้ .toString() บน URL object ซึ่งจะทำการ encode URL โดยอัตโนมัติ
-            const qrCodeData = kioskUrl.toString();
-            
+            // Note: qrCodeData generation is now global (line ~1088)
+
             if (viewMode === 'display') {
                  return (
                     // FIXED: 1. เปลี่ยน min-h-screen เป็น h-screen และเพิ่ม flex-col
@@ -1582,41 +1636,12 @@
                                         <div className="text-2xl mt-4 text-indigo-200">รอเรียกคิวถัดไป</div>
                                     </div>
                                 )}
-                                
-                                {/* OLD QR CODE LOCATION REMOVED */}
-
                             </div>
                             
                             {/* RIGHT COLUMN: WAITING QUEUES LIST */}
                             {/* FIXED: ให้ใช้พื้นที่ 1/3 (lg:w-1/3) และขยายความสูงเต็ม (h-full) */}
                             <div className="w-full lg:w-1/3 bg-slate-800 rounded-3xl shadow-xl flex flex-col overflow-hidden flex-shrink-0 lg:h-full">
                                 
-                                {/* NEW QR CODE LOCATION (ด้านบนของคิวถัดไป) */}
-                                {/* FIXED: อัปเดตเงื่อนไขการแสดงผลเป็น (qrEnabled || qrExpireEnabled) และเพิ่มข้อความ "สแกนเพื่อจองคิว" */}
-                                {(qrEnabled || qrExpireEnabled) && (
-                                    // p-4 mb-4, bg-slate-700/50: ใช้พื้นหลังใสเล็กน้อย
-                                    <div className="p-4 mb-4 bg-slate-700/50 border-b border-slate-600 flex flex-col items-center flex-shrink-0">
-                                        {/* FIXED: เพิ่มข้อความตามที่ลูกค้าร้องขอ */}
-                                        <div className="text-indigo-300 text-sm font-bold mb-2 uppercase tracking-wider">สแกนเพื่อจองคิว</div>
-                                        <div className="bg-white p-3 rounded-xl shadow-lg border border-slate-200 flex flex-col items-center">
-                                            <img 
-                                                // FIXED: ใช้ qrCodeData ที่ encodeURIComponent แล้ว
-                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrCodeData)}`} 
-                                                alt="Queue QR Code" 
-                                                className="w-24 h-24 sm:w-32 sm:h-32" 
-                                                key={qrToken} // Re-render image when token changes, even if expiration is off
-                                            />
-                                            {/* FIXED: แสดงสถานะการหมดอายุตามที่ตั้งค่า */}
-                                            {qrExpireEnabled && qrTokenExpiry ? (
-                                                <div className="text-slate-600 text-xs mt-2 font-mono flex items-center">
-                                                    <Icons.Clock size={12} className="inline-block mr-1 text-red-500"/> หมดอายุใน: {formatCountdown(qrCountdown)}
-                                                </div>
-                                            ) : (qrEnabled && <div className="text-slate-600 text-xs mt-2">QR Code ไม่หมดอายุ</div>)}
-                                        </div>
-                                    </div>
-                                )}
-                                {/* END NEW QR CODE LOCATION */}
-
                                 <div className="p-4 sm:p-6 bg-slate-700 border-b border-slate-600 font-bold text-slate-300 flex items-center justify-between flex-shrink-0">
                                     <div className="text-xl flex items-center gap-2">
                                         <Icons.Clock size={24} className="text-indigo-400" /> คิวถัดไป
@@ -1664,6 +1689,32 @@
                                         <div className="text-center py-10 text-slate-500">ไม่มีคิวรอเรียก</div>
                                     )}
                                 </div>
+
+                                {/* NEW QR CODE LOCATION (Pinned to bottom of the column) */}
+                                {/* FIXED: อัปเดตเงื่อนไขการแสดงผลเป็น (qrEnabled || qrExpireEnabled) และเพิ่มข้อความ "สแกนเพื่อจองคิว" */}
+                                {(qrEnabled || qrExpireEnabled) && (
+                                    // Use p-4 pt-2 to create spacing from the list above, border-t to separate from list
+                                    <div className="p-4 pt-2 flex flex-col items-center flex-shrink-0 bg-slate-700/50 border-t border-slate-600">
+                                        <div className="text-indigo-300 text-sm font-bold mb-2 uppercase tracking-wider">สแกนเพื่อจองคิว</div>
+                                        <div className="bg-white p-3 rounded-xl shadow-lg border border-slate-200 flex flex-col items-center">
+                                            <img 
+                                                // FIXED: ใช้ qrCodeData ที่ encodeURIComponent แล้ว
+                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrCodeData)}`} 
+                                                alt="Queue QR Code" 
+                                                className="w-24 h-24 sm:w-32 sm:h-32" 
+                                                key={qrToken} // Re-render image when token changes, even if expiration is off
+                                            />
+                                            {/* FIXED: แสดงสถานะการหมดอายุตามที่ตั้งค่า */}
+                                            {qrExpireEnabled && qrTokenExpiry ? (
+                                                <div className="text-slate-600 text-xs mt-2 font-mono flex items-center">
+                                                    <Icons.Clock size={12} className="inline-block mr-1 text-red-500"/> หมดอายุใน: {formatCountdown(qrCountdown)}
+                                                </div>
+                                            ) : (qrEnabled && <div className="text-slate-600 text-xs mt-2">QR Code ไม่หมดอายุ</div>)}
+                                        </div>
+                                    </div>
+                                )}
+                                {/* END NEW QR CODE LOCATION */}
+
                             </div>
                         </div>
                     </div>
@@ -1756,7 +1807,15 @@
                             <div className="flex gap-1 sm:gap-2 flex-shrink-0">
                                 <button onClick={() => setShowScanner(true)} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-full flex-shrink-0 transition-colors"><Icons.Scan size={20} className="sm:w-6 sm:h-6"/></button>
                                 <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full flex-shrink-0"><Icons.Settings size={20} className="sm:w-6 sm:h-6"/></button>
-                                <button onClick={openKioskLink} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold shadow-md"><Icons.Link size={16}/> <span className="hidden sm:inline">Kiosk Link</span></button>
+                                <div className="relative group">
+                                    <button onClick={openKioskLink} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors"><Icons.Link size={16}/> <span className="hidden sm:inline">Kiosk Link</span></button>
+                                    <button 
+                                        onClick={openQROnlyLink} 
+                                        className="absolute top-full mt-1 right-0 w-32 bg-slate-700 text-white text-xs p-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50"
+                                    >
+                                        QR Embed Link (New)
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
