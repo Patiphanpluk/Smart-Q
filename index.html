@@ -329,6 +329,8 @@
                     document.body.style.overflow = 'hidden';
                 } else {
                     document.body.style.overflow = 'auto';
+                    // Scroll to top when switching to Admin or Display
+                    window.scrollTo(0, 0);
                 }
                 return () => {
                     document.body.style.overflow = 'auto';
@@ -338,7 +340,7 @@
             // --- Handle Audio Enable ---
             const handleEnableAudio = () => {
                 initGlobalAudio();
-                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
+                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
                 const audio = new Audio(silentAudio);
                 
                 audio.play().then(() => { 
@@ -676,36 +678,6 @@
                 } catch (err) { showToastFn("Error clearing: " + err.message, 'error'); }
             };
 
-            // Toggle Logic
-            const handleServiceToggle = (e) => {
-                const newState = !serviceOpen;
-                if (newState === false) {
-                    // If turning OFF, show popup for reason
-                    setTempClosedReason('');
-                    setShowCloseReasonModal(true);
-                } else {
-                    // If turning ON, save immediately
-                    saveServiceStatus(true, '');
-                }
-            };
-
-            const confirmCloseService = () => {
-                const reason = tempClosedReason.trim() === "" ? "ปิดให้บริการชั่วคราว" : tempClosedReason.trim();
-                saveServiceStatus(false, reason);
-                setShowCloseReasonModal(false);
-            };
-
-            const saveServiceStatus = async (status, reason) => {
-                if (!user || !services) return;
-                try {
-                    let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
-                    await docRef.set({ serviceOpen: status, closedReason: reason }, { merge: true });
-                    setServiceOpen(status);
-                    if(!status) setClosedReason(reason);
-                    showToastFn(status ? "เปิดให้บริการแล้ว" : "ปิดให้บริการแล้ว", 'success');
-                } catch (err) { showToastFn("บันทึกไม่สำเร็จ: " + err.message, 'error'); }
-            };
-
             const handleSaveSettings = async () => {
                 if (!user || !services) return;
                 try {
@@ -867,49 +839,6 @@
                                  </div>
                             </div>
                         )}
-                    </div>
-                );
-            }
-
-            if (viewMode === 'display') {
-                return (
-                    <div className="min-h-screen bg-slate-100 flex flex-col overflow-y-auto">
-                        <div className="flex-1 w-full max-w-[95vw] mx-auto p-4 lg:p-8 flex flex-col justify-center my-auto">
-                           <div className="flex flex-col lg:flex-row gap-6 lg:h-[85vh]">
-                            <div className="flex-1 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl shadow-2xl flex flex-col items-center justify-center text-white relative overflow-hidden p-8 min-h-[50vh] lg:min-h-0">
-                                {!audioEnabled && <button onClick={handleEnableAudio} className="absolute top-4 right-4 bg-white/20 px-4 py-2 rounded-full text-sm flex gap-2 z-50 hover:bg-white/30 transition-all"><Icons.Volume size={16}/> คลิกเพื่อเปิดเสียงพูด</button>}
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
-                                <h2 className="text-2xl font-medium opacity-80 mb-8 uppercase tracking-widest">Calling Queue</h2>
-                                {currentServing ? (
-                                    <div className="text-center animate-bounce-slow w-full">
-                                        <div className="text-8xl md:text-[10rem] lg:text-[12rem] font-black leading-none tracking-normal drop-shadow-lg">{currentServing.number}</div>
-                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-12 py-6 rounded-full inline-block max-w-full"><span className="text-3xl md:text-4xl font-bold truncate block">{currentServing.name}</span></div>
-                                        <div className="mt-10 text-2xl md:text-3xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
-                                    </div>
-                                ) : (
-                                    <div className="text-center opacity-40"><div className="text-8xl md:text-9xl font-black">---</div><div className="text-2xl mt-4">Waiting...</div></div>
-                                )}
-                            </div>
-                            <div className="w-full lg:w-[35rem] bg-white rounded-3xl shadow-xl border border-slate-100 flex flex-col overflow-hidden h-[40vh] lg:h-auto">
-                                <div className="p-6 bg-slate-50 border-b border-slate-100 font-bold text-slate-600 flex items-center gap-2"><Icons.Clock size={20} className="text-indigo-500"/> Next Queue</div>
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
-                                    {waitingQueues.slice(0, 7).map((q) => (
-                                        <div key={q.id} className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-xl shadow-sm">
-                                            <div className="flex items-center gap-4 w-full">
-                                                <div className="w-24 h-16 bg-slate-100 rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-2xl text-slate-600 whitespace-nowrap">{q.number}</div>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="font-bold text-slate-800 text-xl truncate">{q.name}</div>
-                                                    <div className="text-sm text-slate-400 flex items-center gap-2"><span>Waiting</span><span>• {q.timestamp}</span></div>
-                                                </div>
-                                                {q.note && <div className="ml-auto text-xs text-red-500 bg-red-50 px-3 py-1 rounded-lg font-bold border border-red-100 whitespace-nowrap">{q.note}</div>}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {waitingQueues.length === 0 && <div className="text-center py-10 text-slate-300">No waiting queues</div>}
-                                </div>
-                            </div>
-                           </div>
-                        </div>
                     </div>
                 );
             }
