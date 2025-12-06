@@ -1526,12 +1526,14 @@
             const waitingForDisplay = displayQueues.filter(q => q.status === 'waiting').sort((a, b) => a.createdAt - b.createdAt).slice(0, 7); // Show max 7 waiting queues
             
             // Generate full QR Code URL for Display Mode
-            const kioskUrl = new URL(window.location.origin);
+            const kioskUrl = new URL(window.location.href);
+            // FIXED: ต้องลบ search params ออกก่อน เพื่อให้ QR code สะอาด
+            kioskUrl.search = '';
             kioskUrl.searchParams.set('mode', 'kiosk');
             if(qrExpireEnabled && qrToken) {
                  kioskUrl.searchParams.set('queue_token', qrToken);
             }
-            // FIXED: ใช้ encodeURIComponent เพื่อแก้ปัญหา URL เปิดไม่ได้
+            // FIXED: ใช้ .toString() บน URL object ซึ่งจะทำการ encode URL โดยอัตโนมัติ
             const qrCodeData = kioskUrl.toString();
             
             if (viewMode === 'display') {
@@ -1540,7 +1542,8 @@
                     <div className="h-screen bg-slate-900 text-white p-4 sm:p-8 flex flex-col w-full overflow-hidden">
                         
                         {/* FIXED: 2. ส่วนหัว ถูกย้ายมาอยู่ด้านบนสุดและใช้พื้นที่คงที่ (flex-shrink-0) */}
-                        <div className="w-full max-w-full mx-auto flex-shrink-0 text-center mb-4 sm:mb-6">
+                        {/* FIXED: ใช้ max-w-full เพื่อให้ยืดเต็มจอ */}
+                        <div className="w-full max-w-full mx-auto px-0 flex-shrink-0 text-center mb-4 sm:mb-6">
                             <h1 className="text-4xl sm:text-6xl font-black mb-2 text-indigo-400">ระบบแสดงคิวบริการ</h1>
                             <p className="text-xl text-slate-400">Queue & Calling Display</p>
                         </div>
