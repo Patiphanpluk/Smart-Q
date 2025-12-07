@@ -139,7 +139,6 @@
             Sheet: (p) => <Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8" {...p} />,
             Sync: (p) => <Icon d="M21.5 2v6h-6 M21.34 5.5A10 10 0 1 0 22 12 M2.5 22v-6h6 M2.66 18.5A10 10 0 1 0 2 12" {...p} />,
             GoogleScript: (p) => <Icon d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" {...p} />,
-            Link2: (p) => <Icon d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" {...p} />,
             Time: (p) => <Icon d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20 M12 6v6l4 2" {...p} />
         };
         // --- END FIXED: Refactoring Icons to be self-contained SVG or simple Icon calls ---
@@ -1679,6 +1678,13 @@
                 window.open(url.toString(), '_blank'); 
             };
 
+            // FIXED: แยกฟังก์ชันสำหรับเปิด Display Link และให้เปิดเป็นหน้าต่างใหม่เสมอ
+            const openDisplayLink = () => {
+                const url = new URL(window.location.href); 
+                url.searchParams.set('mode', 'display');
+                window.open(url.toString(), '_blank'); 
+            };
+
             const openQROnlyLink = () => { 
                 const url = new URL(window.location.href); 
                 url.searchParams.set('mode', 'qr-only'); 
@@ -2245,7 +2251,8 @@
                                     <span className="hidden sm:inline">Admin</span>
                                     <span className="inline sm:hidden">A</span>
                                 </button>
-                                <button onClick={() => setViewMode('display')} className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${viewMode==='display'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>
+                                {/* FIXED: ให้ Display กดแล้วเปิดหน้าต่างใหม่ */}
+                                <button onClick={openDisplayLink} className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${viewMode==='display'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>
                                     <span className="hidden sm:inline">Display</span>
                                     <span className="inline sm:hidden">D</span>
                                 </button>
