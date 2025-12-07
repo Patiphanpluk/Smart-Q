@@ -2536,11 +2536,13 @@
 
                     {showScanner && (
                         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[70]">
-                            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-fade-in relative">
-                                <button onClick={() => setShowScanner(false)} className="absolute top-2 right-2 text-slate-400 hover:text-slate-600"><Icons.Cross size={24}/></button>
-                                <h2 className="font-bold text-xl mb-4 text-center">สแกน QR Code</h2>
-                                <div id="reader" className="w-full bg-slate-100 rounded-lg overflow-hidden min-h-[300px]"></div>
-                                <p className="text-xs text-center text-slate-400 mt-2">วาง QR Code ให้อยู่ในกรอบ</p>
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-fade-in relative border-t-4 border-indigo-500">
+                                <h2 className="font-bold text-xl mb-4 text-center text-indigo-700 flex items-center justify-center gap-2">
+                                    <Icons.Scan size={24}/> สแกน QR Code เพื่อจัดการคิว
+                                </h2>
+                                <div id="reader" className="w-full bg-slate-100 rounded-lg overflow-hidden min-h-[300px] border border-slate-300 shadow-inner"></div>
+                                <p className="text-xs text-center text-slate-500 mt-4">วาง QR Code ให้อยู่ในกรอบสแกน</p>
+                                <button onClick={() => setShowScanner(false)} className="absolute top-2 right-2 text-slate-400 hover:text-red-600 transition-colors p-2 rounded-full"><Icons.Cross size={24}/></button>
                             </div>
                         </div>
                     )}
@@ -2998,10 +3000,10 @@
                                                         {getStatusBadge(q.status)}
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-2">
-                                                    {/* FIXED: เพิ่มปุ่มเรียกซ้ำ (Recall) กลับเข้าไปในรายการประวัติ */}
-                                                    <button onClick={() => handleRecall(q.id)} className="text-sm bg-white border border-slate-200 px-3 py-1 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 shadow-sm flex items-center gap-1">
-                                                        <Icons.Repeat size={16}/> เรียกซ้ำ
+                                                <div className="flex gap-2 items-center">
+                                                    {/* FIXED: ปรับสไตล์ปุ่มเรียกซ้ำให้เล็กลง */}
+                                                    <button onClick={() => handleRecall(q.id)} className="text-xs bg-indigo-50 border border-indigo-200 px-2.5 py-1.5 rounded-lg hover:bg-indigo-100 text-indigo-600 shadow-sm flex items-center gap-1 font-medium">
+                                                        <Icons.Repeat size={14}/> เรียกซ้ำ
                                                     </button>
                                                     <button onClick={() => setShowEditPopup({ queue: q })} className="text-slate-400 hover:text-indigo-600 p-1 rounded-full hover:bg-slate-200"><Icons.Edit size={16}/></button>
                                                     <button onClick={() => setShowConfirmPopup({ id: q.id, type: 'delete' })} className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-100"><Icons.Trash size={16}/></button>
