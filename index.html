@@ -132,7 +132,7 @@
             QrCode: (p) => <Icon d="M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z" {...p} />,
             Scan: (p) => <Icon d="M3 7V5a2 2 0 0 1 2-2h2 M17 3h2a2 2 0 0 1 2 2v2 M21 17v2a2 2 0 0 1-2 2h-2 M7 21H5a2 2 0 0 1-2-2v-2" {...p} />,
             Speaker: (p) => <Icon d="M11 5L6 9H2v6h4l5 4V5z" {...p} />,
-            Repeat: (p) => <Icon d="M11 5L6 9H2v6h4l5 4V5z M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6 M15 3h6v6 M10 14L21 3" {...p} />,
+            Repeat: (p) => <Icon d="M21 1v6h-6 M3 13a9 9 0 1 0 0 2 9 9 0 0 0 0-18 M3 13v6h6 M21 13a9 9 0 1 0 0-2 9 9 0 0 0 0 18" {...p} />,
             Power: (p) => <Icon d="M18.36 6.64a9 9 0 1 1-12.73 0 M12 2v10" {...p} />,
             Folder: (p) => <Icon d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" {...p} />,
             Search: (p) => <Icon d="M11 11a8 8 0 1 0 0 16 8 8 0 0 0 0-16 M21 21l-4.35-4.35" {...p} />,
@@ -2296,6 +2296,7 @@
                                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                                     <div className="flex gap-1">
                                                         <button onClick={() => handleRecall(currentServing.id)} className="flex-1 flex items-center justify-center gap-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-3 py-2 rounded-xl font-bold text-sm active:scale-95 transition-all whitespace-nowrap"><Icons.Volume size={18}/> เรียก</button>
+                                                        {/* FIXED: เปลี่ยนปุ่มเรียกซ้ำอัตโนมัติเป็นไอคอน Repeat */}
                                                         <button onClick={() => setShowAutoRecallModal(true)} className="flex items-center justify-center bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2 py-2 rounded-xl font-bold text-sm active:scale-95 transition-all" title="เรียกซ้ำอัตโนมัติ"><Icons.Repeat size={18}/></button>
                                                     </div>
                                                     <button onClick={(e) => { e.preventDefault(); openSkipPopup(currentServing); }} className="flex items-center justify-center gap-1 bg-amber-100 text-amber-700 hover:bg-amber-200 px-3 py-2 rounded-xl font-bold text-sm active:scale-95 transition-all whitespace-nowrap"><Icons.Skip size={18}/> ข้าม</button>
@@ -2811,41 +2812,49 @@
                             <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in h-[80vh] flex flex-col">
                                 {/* HEADER - History Modal Header */}
                                 <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                                    {/* FIXED: หัวข้อและปุ่มล้างข้อมูล (ปรับช่องว่าง/ขนาด) */}
-                                    <div className="flex items-center gap-3 flex-shrink-0">
-                                        <h2 className="font-bold text-lg flex items-center gap-2">
-                                            <Icons.History/> 
-                                            {showHistory === 'all' ? 'ประวัติทั้งหมด' : (showHistory === 'completed' ? 'รายการเสร็จสิ้น' : 'รายการยกเลิก')}
-                                            <span className="text-base text-slate-500 font-medium ml-1">({historyList.length} รายการ)</span>
-                                        </h2>
+                                    {/* FIXED: หัวข้อและจำนวนรายการ (แยกบรรทัดบนมือถือ) */}
+                                    <div className="flex flex-col flex-grow min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="font-bold text-lg flex items-center gap-2">
+                                                <Icons.History/> 
+                                                {showHistory === 'all' ? 'ประวัติทั้งหมด' : (showHistory === 'completed' ? 'รายการเสร็จสิ้น' : 'รายการยกเลิก')}
+                                            </h2>
+                                            {/* จำนวนรายการ: แสดงบรรทัดเดียวกับหัวข้อบนจอใหญ่, ย้ายไปอยู่ด้านล่างหัวข้อบนจอมือถือ */}
+                                            <span className="text-base text-slate-500 font-medium ml-1 hidden sm:inline">({historyList.length} รายการ)</span>
+                                            <span className="text-sm text-slate-500 font-medium sm:hidden">({historyList.length} รายการ)</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* ปุ่มล้างข้อมูลและกากบาท (อยู่ขวาบน) */}
+                                    <div className="flex gap-2 items-center flex-shrink-0 absolute top-4 right-4 sm:static">
                                         {showHistory === 'all' && (
                                             <button onClick={() => setShowClearPopup(true)} className="text-xs text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
                                                 <Icons.Trash size={12}/> ล้างข้อมูล
                                             </button>
                                         )}
+                                        <button onClick={() => setShowHistory(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><Icons.Cross size={24}/></button>
                                     </div>
-                                    <button onClick={() => setShowHistory(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors self-end sm:self-center flex-shrink-0"><Icons.Cross/></button>
                                 </div>
 
                                 {/* Sorting Controls */}
                                 <div className="p-4 border-b border-slate-100 bg-slate-50">
                                     <label className="text-xs font-bold text-slate-600 mb-2 block">จัดเรียงตาม:</label>
-                                    <div className="flex flex-wrap gap-2 text-xs">
-                                        {[
-                                            { key: 'created_desc', label: 'จองคิว: ล่าสุด -> เก่าสุด' },
-                                            { key: 'created_asc', label: 'จองคิว: เก่าสุด -> ล่าสุด' },
-                                            { key: 'completed_desc', label: 'เสร็จสิ้น: ล่าสุด -> เก่าสุด', show: showHistory === 'all' || showHistory === 'completed' },
-                                            { key: 'completed_asc', label: 'เสร็จสิ้น: เก่าสุด -> ล่าสุด', show: showHistory === 'all' || showHistory === 'completed' },
-                                        ].filter(item => item.show === undefined || item.show).map((item) => (
-                                            <button
-                                                key={item.key}
-                                                onClick={() => setSortType(item.key)}
-                                                className={`px-3 py-1 rounded-full font-medium transition-colors border ${sortType === item.key ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'}`}
-                                            >
-                                                {item.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    
+                                    {/* Dropdown for Sorting */}
+                                    <select
+                                        value={sortType}
+                                        onChange={(e) => setSortType(e.target.value)}
+                                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                        <option value="created_desc">จองคิว: ล่าสุด -> เก่าสุด (ค่าพื้นฐาน)</option>
+                                        <option value="created_asc">จองคิว: เก่าสุด -> ล่าสุด</option>
+                                        {(showHistory === 'all' || showHistory === 'completed') && (
+                                            <option value="completed_desc">เสร็จสิ้น: ล่าสุด -> เก่าสุด</option>
+                                        )}
+                                        {(showHistory === 'all' || showHistory === 'completed') && (
+                                            <option value="completed_asc">เสร็จสิ้น: เก่าสุด -> ล่าสุด</option>
+                                        )}
+                                    </select>
                                 </div>
                                 
                                 {/* List Content */}
@@ -2853,13 +2862,13 @@
                                     {historyList.length > 0 ? historyList.map(q => (
                                         <div key={q.id} className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors">
                                             <div className="flex justify-between items-start mb-1">
-                                                {/* เลขคิวและสถานะ */}
+                                                {/* เลขคิวและสถานะ + ชื่อผู้จอง */}
                                                 <div className="flex flex-col gap-0.5">
                                                     <div className="flex items-center gap-2">
                                                         <div className="text-xl font-black text-indigo-600">{q.number}</div>
                                                         {getStatusBadge(q.status)}
                                                     </div>
-                                                    {/* FIXED: ชื่อผู้จอง (ใต้เลขคิว) */}
+                                                    {/* FIXED: ชื่อผู้จอง (สีดำ ตัวเล็ก) */}
                                                     <div className="text-sm text-slate-800 font-medium">
                                                         คุณ {q.name}
                                                     </div>
@@ -2867,9 +2876,9 @@
 
                                                 {/* ปุ่มจัดการ */}
                                                 <div className="flex gap-1 items-start flex-shrink-0">
-                                                    {/* FIXED: ปรับสไตล์ปุ่มเรียกซ้ำให้เป็นไอคอนบนมือถือ */}
+                                                    {/* FIXED: ปุ่มเรียกซ้ำใช้ไอคอนลำโพง */}
                                                     <button onClick={() => handleRecall(q.id)} className="text-xs bg-white border border-indigo-200 px-2 sm:px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 shadow-sm flex items-center gap-1 font-medium transition-all">
-                                                        <Icons.Repeat size={14}/>
+                                                        <Icons.Speaker size={14} className="text-indigo-600"/>
                                                         <span className="hidden sm:inline">เรียกซ้ำ</span>
                                                     </button>
                                                     <button onClick={() => setShowEditPopup({ queue: q })} className="text-slate-400 hover:text-indigo-600 p-1 rounded-full hover:bg-slate-200"><Icons.Edit size={16}/></button>
