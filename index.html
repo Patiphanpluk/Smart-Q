@@ -293,9 +293,8 @@
         };
         // --- End Admin Login Component ---
 
-        const Toast = ({ message, type, show }) => {
-            if (!show) return null;
-            return (
+        const Toast = ({ message, type, show }) => (
+            show && (
                 <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] animate-pop-in">
                     <div className={`px-8 py-5 rounded-2xl shadow-2xl font-bold text-white text-xl flex flex-col items-center gap-3 min-w-[240px] text-center backdrop-blur-md border border-white/20 ${type === 'error' ? 'bg-slate-800/90 text-red-400' : 'bg-slate-800/90 text-green-400'}`}>
                         <div className={`p-4 rounded-full ${type === 'error' ? 'bg-red-500/20' : 'bg-green-500/20'} mb-1`}>
@@ -304,8 +303,8 @@
                         <span className="text-white">{message}</span>
                     </div>
                 </div>
-            );
-        };
+            )
+        );
         
         /**
          * Converts total seconds into "MM:SS" format.
@@ -1059,7 +1058,9 @@
                     const limit = aiQueueTimeHistoryLimit || 5;
                     const queuesToAverage = completedQueues.slice(0, limit);
                     
-                    if (queuesToAverage.length < 3) {
+                    const hasSufficientData = queuesToAverage.length >= 3;
+                    
+                    if (!hasSufficientData) {
                         setEtaMap({}); // Not enough data
                         return;
                     }
@@ -1750,11 +1751,11 @@
                             <p className="text-lg font-medium text-slate-800 mb-1">คิวปัจจุบัน: <span className="font-bold text-indigo-600">{currentServing ? currentServing.number : '--'}</span></p>
                             
                             {/* FIXED: แสดงสถานะการหมดอายุตามที่ตั้งค่า */}
-                            {qrEnabled && qrExpireEnabled && qrTokenExpiry ? (
+                            {qrEnabled && qrExpireEnabled && (
                                 <div className="text-sm font-bold text-red-500 mt-2 flex items-center justify-center">
-                                    <Icons.Clock size={16} className="inline-block mr-1"/> QR Code เปลี่ยนใหม่ใน: {formatCountdown(qrCountdown)}
+                                    <Icons.Clock size={16} className="inline-block mr-1"/> QR Code เปลี่ยนใหม่ใน: {qrTokenExpiry && qrCountdown > 0 ? formatCountdown(qrCountdown) : 'กำลังรีเฟรช'}
                                 </div>
-                            ) : (qrEnabled && <div className="text-sm text-slate-500 mt-2">QR Code ไม่หมดอายุ (คงที่)</div>)}
+                            )}
                             
                             <div className="text-xs text-slate-400 mt-4">Powered by Q-Master System</div>
 
@@ -1767,6 +1768,8 @@
                 // Get ETA for my queue only in Kiosk mode
                 const myEtaSeconds = aiQueueTimeEnabled && myQueue ? etaMap[myQueue.id] : null;
 
+                const hasSufficientData = queues.filter(q => q.status === 'completed' && q.durationMs > 0).length >= 3;
+                
                 return (
                     // กล่องหลักสำหรับหน้า KIOSK
                     <div className="h-[100dvh] w-screen bg-slate-100 flex flex-col overflow-hidden fixed inset-0">
@@ -1816,14 +1819,13 @@
                                             <div className="text-center text-slate-400 text-sm">รออยู่ <span className="text-indigo-600 font-bold">{queues.filter(q => q.status === 'waiting').length}</span> คิว</div>
                                             
                                             {/* Estimated Time (Kiosk Mode: Target first waiting queue - BEFORE booking) */}
-                                            {/* FIXED: ปรับปรุงการแสดงผล ETA สำหรับคิวก่อนจอง */}
                                             {aiQueueTimeEnabled && waitingQueues.length > 0 && (
                                                 <div className="text-center text-sm text-green-600 font-bold bg-green-50 p-3 rounded-lg border border-green-100 animate-fade-in">
                                                     <Icons.Time size={16} className="inline-block mr-1"/>
                                                     คิวถัดไปคาดว่าจะใช้เวลา: {
                                                         etaMap[waitingQueues[0].id] !== undefined && etaMap[waitingQueues[0].id] !== null && etaMap[waitingQueues[0].id] > 0
                                                             ? formatSecondsToMinutes(etaMap[waitingQueues[0].id])
-                                                            : (queues.filter(q => q.status === 'completed').length < 3 ? 'กำลังเรียนรู้เวลาเฉลี่ย...' : '--')
+                                                            : (hasSufficientData ? '--' : 'กำลังเรียนรู้เวลาเฉลี่ย...')
                                                     }
                                                 </div>
                                             )}
@@ -1883,7 +1885,7 @@
                                             คาดว่าคิวจะถึงใน: {
                                                 myEtaSeconds !== null && myEtaSeconds !== undefined && myEtaSeconds > 0
                                                     ? formatSecondsToMinutes(myEtaSeconds)
-                                                    : (queues.filter(q => q.status === 'completed').length < 3 ? 'กำลังเรียนรู้เวลาเฉลี่ย...' : '--')
+                                                    : (hasSufficientData ? '--' : 'กำลังเรียนรู้เวลาเฉลี่ย...')
                                             }
                                         </div>
                                     )}
@@ -2126,6 +2128,7 @@
                 .slice(0, 7); 
             
             // Note: qrCodeData generation is now global (line ~1088)
+            const hasSufficientData = queues.filter(q => q.status === 'completed' && q.durationMs > 0).length >= 3;
 
             if (viewMode === 'display') {
                 
@@ -2248,7 +2251,7 @@
                                                             <Icons.Time size={14} className="mr-1"/> 
                                                             {showEta 
                                                                 ? formatSecondsToMinutes(etaSeconds)
-                                                                : (queues.filter(q => q.status === 'completed').length < 3 ? 'กำลังคำนวณ...' : '--')
+                                                                : (hasSufficientData ? '--' : 'กำลังคำนวณ...')
                                                             }
                                                         </div>
                                                     )}
@@ -2301,9 +2304,9 @@
                                             />
                                             
                                             {/* FIXED: แสดงสถานะการหมดอายุ (เปลี่ยนสีเป็น red-600) */}
-                                            {qrEnabled && qrExpireEnabled && qrTokenExpiry && (
+                                            {qrEnabled && qrExpireEnabled && (
                                                 <div className="text-[10px] text-red-600 mt-1 font-mono flex items-center justify-center">
-                                                    <Icons.Clock size={10} className="inline-block mr-0.5"/> หมดอายุใน: {formatCountdown(qrCountdown)}
+                                                    <Icons.Clock size={10} className="inline-block mr-0.5"/> หมดอายุใน: {qrTokenExpiry && qrCountdown > 0 ? formatCountdown(qrCountdown) : 'กำลังรีเฟรช'}
                                                 </div>
                                             )}
                                         </div>
@@ -2740,7 +2743,7 @@
                                                 </button>
                                                 {qrEnabled && qrTokenExpiry && (
                                                      <div className="text-xs text-slate-500 text-center">
-                                                         QR Code จะหมดอายุใน: {formatCountdown(qrCountdown)}
+                                                         QR Code จะหมดอายุใน: {qrCountdown > 0 ? formatCountdown(qrCountdown) : 'กำลังรีเฟรช'}
                                                      </div>
                                                 )}
                                             </div>
