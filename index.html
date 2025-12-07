@@ -125,6 +125,7 @@
             Settings: (p) => (
                 <img src="https://img2.pic.in.th/pic/settings3209826b30ab5f22.png" width={p.size||24} height={p.size||24} className={`object-contain ${p.className||''}`} alt="Settings" />
             ),
+            // FIXED: แก้ไข Unterminated string constant
             Trash: (p) => <Icon d="M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" {...p} />,
             History: (p) => <Icon d="M3 3v5h5 M3.05 13A9 9 0 1 0 6 5.3L3 8" {...p} />,
             Skip: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" x2="19" y1="5" y2="19" /></svg>,
@@ -398,10 +399,8 @@
             }
             
             // 4. Calculate estimated time remaining
-            // FIXED: แก้ไขชื่อตัวแปรที่มีเว้นวรรค
             const estimatedTotalMs = totalPeopleAhead * averageServiceTimeMs;
             
-            // FIXED: แก้ไขชื่อตัวแปรที่มีเว้นวรรค
             return Math.ceil(estimatedTotalMs / 1000); // return in seconds
         };
 
@@ -449,10 +448,8 @@
             
             const totalPeopleAhead = queuesAhead + currentServingFactor;
             
-            // FIXED: แก้ไขชื่อตัวแปรที่มีเว้นวรรค
             const estimatedTotalMs = totalPeopleAhead * averageServiceTimeMs;
             
-            // FIXED: แก้ไขชื่อตัวแปรที่มีเว้นวรรค
             return Math.ceil(estimatedTotalMs / 1000); // return in seconds
         }
 
@@ -498,6 +495,7 @@
             // --- NEW: AI Time Estimation States ---
             const [aiQueueTimeEnabled, setAiQueueTimeEnabled] = useState(false);
             const [aiQueueTimeHistoryLimit, setAiQueueTimeHistoryLimit] = useState(5); // Use last 5 completed queues
+            // Removed estimatedTimeSeconds state for central calculation
             // ---------------------------------------
             
             const [useGasForLink, setUseGasForLink] = useState(true); 
@@ -727,8 +725,8 @@
                     if (!response.ok) throw new Error("GAS connection failed");
                     
                     const json = await response.json();
-                    
-                    // Convert Array to String Format (Key, Link)
+                    const currentTime = Date.now(); // Get current timestamp
+
                     if (Array.isArray(json)) {
                         const mappingString = json.map(row => {
                              if (Array.isArray(row) && row.length >= 2) {
@@ -738,18 +736,15 @@
                              return null;
                         }).filter(Boolean).join('\n');
 
-                        const currentTime = Date.now(); // Get current timestamp
-
-                        // Update state
+                        // Only update state if mapping has changed 
                         setExternalLinkMapping(prev => {
                             if (prev !== mappingString && isManualSync) {
                                 // Log silent update, but don't toast
                                 console.log("GAS mapping silently updated.");
-                                showToastFn("อัปเดตข้อมูลจาก GAS เรียบร้อยแล้ว", "success");
                             }
                             return mappingString;
                         });
-
+                        
                         setLastGasSyncTime(currentTime); // Update sync time
 
                         // Only save to Firestore if it's a manual sync (to prevent excessive writes)
@@ -758,7 +753,7 @@
                             await docRef.set({ externalLinkMapping: mappingString, lastGasSyncTime: currentTime }, { merge: true });
                         }
                     } else {
-                        throw new Error("รูปแบบข้อมูลจาก GAS ไม่ถูกต้อง");
+                        console.warn("GAS data format invalid for silent sync.");
                     }
                     
                 } catch (error) {
@@ -1095,11 +1090,9 @@
                             if (remaining === 0) {
                                 localStorage.removeItem(ADMIN_EXPIRY_KEY);
                                 setIsAdminAuthenticated(false);
-                                showToastFn("Admin Session หมดอายุแล้ว", "error");
+                                // Note: We avoid showing toast on the final zero tick as it can cause an endless loop with the auth check logic
                             }
                         } else {
-                            // If user is authenticated but no expiry is set (e.g., first load/re-auth without expiry set)
-                            // We treat it as expired for robustness if the expiry is not persisted on the next tick
                             setAdminSessionRemainingSeconds(0);
                         }
                     }
@@ -1968,7 +1961,7 @@
                                                 <div className="pt-2 mt-2 border-t border-slate-200">
                                                     <button 
                                                         onClick={() => handleOpenExternalLink(externalLinkMapping, selectedHistoryItem.number, true)} 
-                                                        className="w-full py-3 bg-blue-600 border border-blue-700 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-md"
+                                                        className="w-full py-3 bg-blue-600 border border-blue-700 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-md animate-bounce-slow"
                                                     >
                                                         <Icons.Folder size={18} /> {externalLinkLabel || 'เปิดเอกสาร / โฟลเดอร์คิว'}
                                                     </button>
@@ -2088,7 +2081,8 @@
                                         </div>
                                         {/* FIXED: ลดขนาดตัวอักษรเป็น text-3xl md:text-5xl (ตามที่ผู้ใช้แจ้ง) และลบ py-4 ออกจาก div หุ้ม แล้วย้าย py-2 ไปที่ span */}
                                         <div className="mt-8 bg-white/20 backdrop-blur-md px-6 rounded-full inline-block mx-auto max-w-full">
-                                            <span className="text-3xl md:text-5xl font-bold block whitespace-nowrap overflow-hidden text-ellipsis py-2">คุณ {currentDisplayServing.name}</span>
+                                            {/* บรรทัด 1324 */}
+                                            <span className="text-3xl md:text-5xl font-bold block whitespace-nowrap overflow-hidden text-ellipsis py-4">คุณ {currentDisplayServing.name}</span>
                                         </div>
                                         <div className="mt-10 text-2xl md:text-4xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
                                     </div>
@@ -2289,8 +2283,8 @@
                                 
                                 {/* NEW: Admin Session Timer Display */}
                                 {viewMode === 'admin' && isAdminAuthenticated && adminSessionRemainingSeconds > 0 && (
-                                    <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-full flex items-center gap-1 ml-2">
-                                        <Icons.Time size={14} className="text-indigo-400"/>
+                                    <span className={`text-xs font-mono text-white px-2 py-1 rounded-full flex items-center gap-1 ml-2 ${adminSessionRemainingSeconds < 60 ? 'bg-red-500 animate-pulse' : 'bg-indigo-600'}`}>
+                                        <Icons.Time size={14} className="text-white"/>
                                         {formatTimer(adminSessionRemainingSeconds)}
                                     </span>
                                 )}
@@ -2331,7 +2325,7 @@
                                         <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-indigo-50 rounded-xl p-6 border border-indigo-100">
                                             <div className="text-center md:text-left flex-shrink-0">
                                                 <div className="text-xs font-bold text-indigo-400 uppercase">Serving Now</div>
-                                                <div className="text-5xl font-black text-slate-800 mt-1 mb-2 whitespace-nowrap">{currentServing.number}</div>
+                                                <div className="text-7xl font-black text-slate-800 mt-1 mb-2 whitespace-nowrap">{currentServing.number}</div>
                                                 <div className="text-xl font-medium text-slate-600 whitespace-nowrap">คุณ {currentServing.name}</div>
                                             </div>
                                             <div className="flex flex-col gap-2 w-full md:w-auto md:ml-auto">
@@ -2526,7 +2520,6 @@
                                                 placeholder="เหตุผลการปิดให้บริการ" 
                                             />
                                             {/* FIXED: เพิ่มปุ่มบันทึกสำหรับเหตุผล พร้อม Logic สีปุ่ม */}
-                                            {/* ตรวจสอบว่าค่าปัจจุบัน (tempEditClosedReason) แตกต่างจากค่าที่บันทึกใน Firestore (closedReason) หรือไม่ */}
                                             {(() => {
                                                 const isUnsaved = tempEditClosedReason !== closedReason;
                                                 const buttonClass = isUnsaved 
@@ -2719,7 +2712,7 @@
                                                         type="text" 
                                                         value={externalLinkLabel || ''} 
                                                         onChange={e => setExternalLinkLabel(e.target.value)} 
-                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 transition-all" 
+                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
                                                         placeholder="เปิดเอกสาร" 
                                                     />
                                                 </div>
