@@ -2264,7 +2264,7 @@
                                                     {/* FIXED: แสดงวันที่และเวลา */}
                                                     <span className="text-xs text-indigo-200 block font-medium flex-shrink-0">
                                                         {/* FIXED: แสดงข้อความ "คิวถัดไป" สำหรับคิวแรกในรายการรอ */}
-                                                        {index === 0 ? "คิวถัดไป (กำลังจะเรียก)" : `${index + 1} คิวถัดไป`}
+                                                        {index === 0 ? "คิวถัดไป (กำลังจะเรียก)" : `คิวที่ ${index + 1} ที่รออยู่`}
                                                     </span>
                                                 </div>
                                                 
@@ -2412,8 +2412,15 @@
                                 )}
                             </div>
                             <div className="flex gap-1 bg-slate-100 p-1 rounded-lg flex-shrink-0">
-                                <button onClick={() => setViewMode('admin')} className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold ${viewMode==='admin'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>Admin</button>
-                                <button onClick={() => setViewMode('display')} className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold ${viewMode==='display'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>Display</button>
+                                {/* FIXED: ปรับปุ่ม Admin/Display ให้เป็นแบบย่อบนมือถือ */}
+                                <button onClick={() => setViewMode('admin')} className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${viewMode==='admin'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>
+                                    <span className="hidden sm:inline">Admin</span>
+                                    <span className="inline sm:hidden">A</span>
+                                </button>
+                                <button onClick={() => setViewMode('display')} className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${viewMode==='display'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>
+                                    <span className="hidden sm:inline">Display</span>
+                                    <span className="inline sm:hidden">D</span>
+                                </button>
                             </div>
                             <div className="flex gap-1 sm:gap-2 flex-shrink-0">
                                 <button onClick={() => setShowScanner(true)} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-full flex-shrink-0 transition-colors"><Icons.Scan size={20} className="sm:w-6 sm:h-6"/></button>
@@ -2992,6 +2999,10 @@
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-2">
+                                                    {/* FIXED: เพิ่มปุ่มเรียกซ้ำ (Recall) กลับเข้าไปในรายการประวัติ */}
+                                                    <button onClick={() => handleRecall(q.id)} className="text-sm bg-white border border-slate-200 px-3 py-1 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 shadow-sm flex items-center gap-1">
+                                                        <Icons.Repeat size={16}/> เรียกซ้ำ
+                                                    </button>
                                                     <button onClick={() => setShowEditPopup({ queue: q })} className="text-slate-400 hover:text-indigo-600 p-1 rounded-full hover:bg-slate-200"><Icons.Edit size={16}/></button>
                                                     <button onClick={() => setShowConfirmPopup({ id: q.id, type: 'delete' })} className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-100"><Icons.Trash size={16}/></button>
                                                 </div>
