@@ -332,38 +332,44 @@
         };
 
         /**
-         * Converts duration in milliseconds into "MM:SS" or "HH:MM:SS" format.
-         * @param {number} ms - Total duration in milliseconds.
+         * Formats duration from milliseconds to a readable string (e.g., "5 นาที 30 วินาที")
+         * @param {number} durationMs - Duration in milliseconds.
          * @returns {string} Formatted duration string.
          */
-        const formatDuration = (ms) => {
-            const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+        const formatDuration = (durationMs) => {
+            if (typeof durationMs !== 'number' || durationMs <= 0) return '--';
+            const totalSeconds = Math.floor(durationMs / 1000);
             const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
             const seconds = totalSeconds % 60;
             
-            if (hours > 0) {
-                return `${String(hours)}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+            let parts = [];
+            if (hours > 0) parts.push(`${hours} ชม.`);
+            if (minutes > 0) parts.push(`${minutes} นาที`);
+            if (seconds > 0 || parts.length === 0) parts.push(`${seconds} วินาที`);
+            
+            return parts.join(' ');
+        };
+
+        // Helper for Admin History Modal status badge
+        const getStatusBadge = (status) => {
+            let text, color;
+            switch (status) {
+                case 'completed': text = 'เสร็จสิ้น'; color = 'bg-green-500'; break;
+                case 'cancelled': text = 'ยกเลิก'; color = 'bg-red-500'; break;
+                case 'serving': text = 'กำลังเรียก'; color = 'bg-indigo-500'; break;
+                case 'waiting': text = 'กำลังรอ'; color = 'bg-amber-500'; break;
+                default: text = 'Unknown'; color = 'bg-slate-500';
             }
-            return `${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+            return <span className={`text-xs font-bold text-white px-2 py-0.5 rounded-full ${color}`}>{text}</span>;
         };
         
         /**
-         * NEW: Helper function to format timestamp to date/time string (DD/MM/YY HH:MM)
-         * @param {number} timestamp - Milliseconds since epoch.
-         * @returns {string} Formatted date and time string (DD/MM/YYYY HH:MM:SS).
-         */
-        const formatDateTime = (timestamp) => {
-            if (!timestamp) return 'N/A';
-            const date = new Date(timestamp);
-            const dateString = date.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const timeString = date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            return `${dateString} ${timeString}`;
-        };
-
-        /**
          * Estimates the remaining time for a waiting queue based on past service history.
-         * (Skipped detailed implementation, rely on the main useffect logic for stability)
+         * @param {Array<Object>} queues - All queue objects.
+         * @param {string|null} myQueueId - The ID of the current user's queue (for Kiosk Mode).
+         * @param {Object} config - AI time configuration {enabled, limit}.
+         * @returns {number|null} Estimated time remaining in seconds, or null if calculation is not possible.
          */
         const getEstimatedTime = (queues, myQueueId, config) => {
             if (!config.enabled) return null;
@@ -385,8 +391,8 @@
 
             // 1. Filter and sort queues that have completed service time metrics
             const completedQueues = queues
-                // Ensure calledAt and completedAt exist
-                .filter(q => q.status === 'completed' && q.calledAt && q.completedAt)
+                // Ensure calledAt, completedAt, and durationMs exist
+                .filter(q => q.status === 'completed' && q.calledAt && q.completedAt && typeof q.durationMs === 'number' && q.durationMs > 0)
                 .sort((a, b) => b.completedAt - a.completedAt); // Sort by most recently completed
 
             // 2. Calculate average service time (in milliseconds)
@@ -400,8 +406,8 @@
             }
 
             queuesToAverage.forEach(q => {
-                const serviceDuration = q.completedAt - q.calledAt;
-                totalServiceTime += serviceDuration;
+                // Use stored durationMs for calculating the average
+                totalServiceTime += q.durationMs;
             });
 
             // Ensure the average is at least 30 seconds (30000ms) to prevent overly aggressive estimates
@@ -434,7 +440,10 @@
         /**
          * Calculates the estimated time in seconds for a specific queue ID
          * by finding its position in the waiting list.
-         * (Skipped detailed implementation, rely on the main useffect logic for stability)
+         * @param {Array<Object>} queues - All queue objects.
+         * @param {string} queueId - The ID of the queue to estimate.
+         * @param {Object} config - AI time configuration {enabled, limit}.
+         * @returns {number|null} Estimated time remaining in seconds, or null.
          */
         const getEstimatedTimeForQueueId = (queues, queueId, config) => {
             if (!config.enabled) return null;
@@ -444,7 +453,7 @@
 
             // 1. Filter and sort completed queues to get average time
             const completedQueues = queues
-                .filter(q => q.status === 'completed' && q.calledAt && q.completedAt)
+                .filter(q => q.status === 'completed' && q.calledAt && q.completedAt && typeof q.durationMs === 'number' && q.durationMs > 0)
                 .sort((a, b) => b.completedAt - a.completedAt); 
 
             let totalServiceTime = 0;
@@ -454,8 +463,8 @@
             if (queuesToAverage.length < 3) return null;
 
             queuesToAverage.forEach(q => {
-                const serviceDuration = q.completedAt - q.calledAt;
-                totalServiceTime += serviceDuration;
+                // Use stored durationMs for calculating the average
+                totalServiceTime += q.durationMs;
             });
             const averageServiceTimeMs = Math.max(30000, totalServiceTime / queuesToAverage.length); 
 
@@ -640,6 +649,15 @@
                 return new Date(timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             };
             
+            // NEW: Helper function to format timestamp to date/time string (DD/MM/YY HH:MM)
+            const formatDateTime = (timestamp) => {
+                if (!timestamp) return 'N/A';
+                const date = new Date(timestamp);
+                const dateString = date.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit' });
+                const timeString = date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                return `${dateString} ${timeString}`;
+            };
+
             // Helper function to check if the link is a Google Drive link
             const isGoogleDriveLink = (url) => {
                 return url && typeof url === 'string' && url.includes('drive.google.com/drive');
@@ -841,7 +859,7 @@
             // --- Handle Audio Enable ---
             const handleEnableAudio = () => {
                 initGlobalAudio();
-                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
+                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
                 const audio = new Audio(silentAudio);
                 
                 audio.play().then(() => { 
@@ -879,7 +897,7 @@
                     
                     if (e.key === 'Enter') {
                         const currentServing = queues.find(q => q.status === 'serving');
-                        // Add completedAt timestamp when status is set to 'completed'
+                        // Pass Date.now() when status changes to 'completed'
                         if (currentServing) updateStatus(currentServing.id, 'completed', Date.now());
                     }
                 };
@@ -1034,7 +1052,7 @@
                     
                     // 1. Calculate the base average service time once
                     const completedQueues = queues
-                        .filter(q => q.status === 'completed' && q.calledAt && q.completedAt)
+                        .filter(q => q.status === 'completed' && q.calledAt && q.completedAt && typeof q.durationMs === 'number' && q.durationMs > 0)
                         .sort((a, b) => b.completedAt - a.completedAt); 
 
                     let totalServiceTime = 0;
@@ -1047,8 +1065,8 @@
                     }
 
                     queuesToAverage.forEach(q => {
-                        const serviceDuration = q.completedAt - q.calledAt;
-                        totalServiceTime += serviceDuration;
+                         // Use stored durationMs for calculating the average
+                        totalServiceTime += q.durationMs;
                     });
                     const averageServiceTimeMs = Math.max(30000, totalServiceTime / queuesToAverage.length); 
                     
@@ -1204,8 +1222,8 @@
 
                             // Only update state if mapping has changed 
                             setExternalLinkMapping(prev => {
-                                // Note: isManualSync is undefined here, so this check will always return false if mapping is the same, which is fine for silent logging.
-                                if (prev !== mappingString) {
+                                if (prev !== mappingString && isManualSync) {
+                                    // Log silent update, but don't toast
                                     console.log("GAS mapping silently updated.");
                                 }
                                 return mappingString;
@@ -1214,8 +1232,10 @@
                             setLastGasSyncTime(currentTime); // Update sync time
 
                             // Only save to Firestore if it's a manual sync (to prevent excessive writes)
-                            // if (isManualSync && user && services) { ... }
-                            
+                            if (isManualSync && user && services) {
+                                let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
+                                await docRef.set({ externalLinkMapping: mappingString, lastGasSyncTime: currentTime }, { merge: true });
+                            }
                         } else {
                             console.warn("GAS data format invalid for silent sync.");
                         }
@@ -1293,17 +1313,7 @@
                 try {
                     let collectionRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('queues') : services.db.collection('queues');
                     // Add createdAt only (completedAt will be added when status changes to 'completed')
-                    const ref = await collectionRef.add({ 
-                        number: queueNumber, 
-                        name: customerName, 
-                        status: 'waiting', 
-                        createdAt: Date.now(), 
-                        calledAt: null, 
-                        completedAt: null, 
-                        skipCount: 0, 
-                        note: '',
-                        durationMs: 0, // NEW: Initialize duration
-                    });
+                    const ref = await collectionRef.add({ number: queueNumber, name: customerName, status: 'waiting', createdAt: Date.now(), calledAt: null, completedAt: null, durationMs: null, skipCount: 0, note: '' });
                     localStorage.setItem('my_queue_id', ref.id);
                     
                     // Save to local history
@@ -1327,7 +1337,7 @@
             };
 
             /**
-             * Updates the status of a queue. Automatically handles setting timestamps and duration.
+             * Updates the status of a queue. Automatically handles setting timestamps.
              * @param {string} id - Queue ID.
              * @param {string} status - New status ('serving', 'completed', 'waiting', 'cancelled').
              * @param {number} [completedAt=null] - Optional timestamp for 'completed' status.
@@ -1346,24 +1356,33 @@
                     if (status === 'serving') {
                         updateData.calledAt = Date.now();
                         updateData.completedAt = null; // Clear completion time if recalling
-                        updateData.durationMs = 0; // Clear duration on new call
+                        updateData.durationMs = firebase.firestore.FieldValue.delete(); // Clear duration
                     } else if (status === 'completed') {
-                        const finalCompletedAt = completedAt || Date.now();
-                        updateData.completedAt = finalCompletedAt; // Record actual completion time
-
-                        // Calculate durationMs (Request 1.3)
-                        const currentQ = queues.find(q => q.id === id);
-                        if (currentQ && currentQ.calledAt) {
-                            updateData.durationMs = finalCompletedAt - currentQ.calledAt;
+                        const completionTime = completedAt || Date.now();
+                        updateData.completedAt = completionTime;
+                        
+                        // Fetch the current document to get 'calledAt' for duration calculation
+                        const currentDoc = await docRef.get();
+                        const qData = currentDoc.data();
+                        
+                        if (qData && qData.calledAt) {
+                            // Calculate duration in milliseconds
+                            updateData.durationMs = completionTime - qData.calledAt;
                         } else {
-                            // If calledAt is missing, assume duration is 0
-                            updateData.durationMs = 0;
+                            // If calledAt is missing, set duration to 0
+                            updateData.durationMs = 0; 
                         }
-                    } else if (status === 'waiting' || status === 'cancelled') {
-                        // Reset timestamps and duration if status is manually set back to waiting/cancelled
+                        
+                    } else if (status === 'waiting') {
+                        // Reset timestamps and duration if status is manually set back to waiting
                         updateData.calledAt = null;
                         updateData.completedAt = null;
-                        updateData.durationMs = 0;
+                        updateData.durationMs = firebase.firestore.FieldValue.delete(); // Clear duration
+                    } else if (status === 'cancelled') {
+                        // Reset timestamps and duration for cancelled
+                        updateData.calledAt = null;
+                        updateData.completedAt = null;
+                        updateData.durationMs = firebase.firestore.FieldValue.delete(); // Clear duration
                     }
                     
                     await docRef.update(updateData);
@@ -1416,7 +1435,7 @@
                         createdAt: newCreatedAt,
                         calledAt: null, // Clear calling time
                         completedAt: null, // Clear completion time
-                        durationMs: 0, // Clear duration
+                        durationMs: firebase.firestore.FieldValue.delete(), // Clear duration
                     });
                     setShowSkipPopup(false); setQueueToSkip(null);
                     if(showScannedAction) setShowScannedAction(null);
@@ -1442,7 +1461,7 @@
                         status: 'serving', 
                         calledAt: Date.now(),
                         completedAt: null, // Clear completion time on recall
-                        durationMs: 0, // Clear duration
+                        durationMs: firebase.firestore.FieldValue.delete(), // Clear duration
                     });
                     setShowHistory(null);
                     if(showScannedAction) setShowScannedAction(null);
@@ -1478,7 +1497,7 @@
                         status: 'serving', 
                         calledAt: Date.now(),
                         completedAt: null, // Clear completion time on recall
-                        durationMs: 0, // Clear duration
+                        durationMs: firebase.firestore.FieldValue.delete(), // Clear duration
                     });
                 } catch (err) { console.error("Auto recall error", err); }
 
@@ -1670,26 +1689,9 @@
             const currentServing = queues.find(q => q.status === 'serving');
             const myQueue = queues.find(q => q.id === myQueueId);
             
-            // Helper for Admin History Item Status/Color (Request 2.2)
-            const getStatusClasses = (status) => {
-                switch (status) {
-                    case 'completed':
-                        return { label: 'เสร็จสิ้น', bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' };
-                    case 'cancelled':
-                        return { label: 'ยกเลิก', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' };
-                    case 'serving':
-                        return { label: 'กำลังเรียก', bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-200' };
-                    case 'waiting':
-                    default:
-                        return { label: 'กำลังรอ', bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' };
-                }
-            };
-            
-            // Build history list, sorted by newest first (Request 2.3)
             let historyList = [];
-            const allQueues = [...queues].sort((a, b) => b.createdAt - a.createdAt);
-            if (showHistory === 'all') historyList = allQueues;
-            else if (showHistory) historyList = allQueues.filter(q => q.status === showHistory);
+            if (showHistory === 'all') historyList = [...queues].sort((a, b) => b.createdAt - a.createdAt);
+            else if (showHistory) historyList = queues.filter(q => q.status === showHistory).sort((a, b) => b.createdAt - a.createdAt);
 
             if (configError) return <SetupError errorMsg={errorMsg} />;
             if (loading) return <div className="h-screen flex items-center justify-center text-slate-400">กำลังเชื่อมต่อระบบ...</div>;
@@ -1876,52 +1878,48 @@
                                         </div>
                                     )}
 
-                                    {/* Status Details (Refactored for Request 1.2) */}
                                     <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2 flex-shrink-0">
-                                        {/* NEW: Move Name to the top, always visible */}
-                                        <div className="flex justify-between items-center text-sm border-b border-slate-200 pb-2">
-                                            <span className="text-slate-400">ชื่อผู้จอง</span>
-                                            <span className="font-bold text-slate-700 truncate max-w-[150px]">{myQueue.name}</span>
+                                        
+                                        {/* Booker Name - Moved Up */}
+                                        <div className="flex justify-between items-center text-sm pb-2 border-b border-slate-200">
+                                            <span className="text-slate-400 font-bold">ชื่อผู้จอง</span>
+                                            <span className="font-black text-slate-800 truncate max-w-[150px]">{myQueue.name}</span>
                                         </div>
 
-                                        {myQueue.status === 'completed' ? (
-                                            // --- Completed Status Detail (Request 1.2) ---
-                                            <div className="pt-2 space-y-2">
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-slate-500">เวลาจองคิว ({myQueue.number})</span>
-                                                    <span className="font-bold text-slate-700">{formatDateTime(myQueue.createdAt)}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-slate-500">เริ่มรับบริการ</span>
-                                                    <span className="font-bold text-slate-700">{myQueue.calledAt ? formatDateTime(myQueue.calledAt) : 'N/A'}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-slate-500">เสร็จสิ้นบริการ</span>
-                                                    <span className="font-bold text-green-700">{myQueue.completedAt ? formatDateTime(myQueue.completedAt) : 'N/A'}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm pt-2 border-t border-green-200 font-bold bg-green-50 p-2 rounded-lg">
-                                                    <span className="text-green-800 flex items-center gap-1"><Icons.Time size={16}/> ใช้เวลาทั้งหมด</span>
-                                                    {/* Display durationMs calculated in updateStatus (Request 1.3) */}
-                                                    <span className="text-green-800">{myQueue.durationMs !== undefined ? formatDuration(myQueue.durationMs) : 'N/A'}</span>
-                                                </div>
-                                            </div>
-                                            // --- End Completed Status Detail ---
-                                        ) : (
-                                            // --- Waiting/Serving Status Detail (Original Logic, without Name row) ---
-                                            <div className="pt-2 space-y-2">
+                                        {/* Dynamic details based on status */}
+                                        {myQueue.status !== 'completed' ? (
+                                            <>
                                                 <div className="flex justify-between items-end pb-2">
                                                     <div className="text-left">
                                                         <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">คิวปัจจุบัน</div>
                                                         <div className="text-2xl font-black text-indigo-600 leading-none">{currentServing ? currentServing.number : '--'}</div>
                                                     </div>
-                                                    {/* รออีก (คิว) - Excluded when completed */}
                                                     <div className="text-right">
                                                         <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">รออีก (คิว)</div>
                                                         <div className="2xl font-black text-slate-700 leading-none">{queues.filter(q => q.status === 'waiting' && q.createdAt < myQueue.createdAt).length}</div>
                                                     </div>
                                                 </div>
+                                            </>
+                                        ) : (
+                                            // Display Completed Status Details
+                                            <div className="space-y-2 pt-2">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-500">เวลาจองคิว</span>
+                                                    <span className="font-medium text-slate-700">{formatDateTime(myQueue.createdAt)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-500">เริ่มรับบริการ</span>
+                                                    <span className="font-medium text-slate-700">{myQueue.calledAt ? formatDateTime(myQueue.calledAt) : 'N/A'}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-500">เสร็จสิ้นบริการ</span>
+                                                    <span className="font-medium text-green-700">{myQueue.completedAt ? formatDateTime(myQueue.completedAt) : 'N/A'}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm font-bold pt-2 border-t border-slate-200">
+                                                    <span className="text-slate-600">ใช้เวลาทั้งหมด</span>
+                                                    <span className="font-black text-indigo-600">{formatDuration(myQueue.durationMs)}</span>
+                                                </div>
                                             </div>
-                                            // --- End Waiting/Serving Status Detail ---
                                         )}
                                         
                                         {/* QR Code Button */}
@@ -1933,7 +1931,7 @@
                                             </div>
                                         )}
 
-                                        {/* External Link Button (Only when Completed) */}
+                                        {/* NEW: External Link Button (Only when Completed) */}
                                         {externalLinkEnabled && myQueue.status === 'completed' && (
                                             <div className="pt-2 mt-2 border-t border-slate-200">
                                                 <button 
@@ -1946,7 +1944,7 @@
                                         )}
                                     </div>
                                     
-                                    {/* Audio Enable Button (Small) - Hide when completed (Request 1.1) */}
+                                    {/* Audio Enable Button (Small) - Hide when completed */}
                                     {!audioEnabled && myQueue.status !== 'completed' && (
                                         <button onClick={handleEnableAudio} className="flex-shrink-0 flex items-center justify-center gap-2 w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 py-2 rounded-xl font-bold text-sm transition-colors border border-indigo-200">
                                             <Icons.Speaker size={16}/> 🔔 เปิดเสียงแจ้งเตือน
@@ -2443,7 +2441,7 @@
                                                     <button onClick={(e) => { e.preventDefault(); openSkipPopup(currentServing); }} className="flex items-center justify-center gap-1 bg-amber-100 text-amber-700 hover:bg-amber-200 px-3 py-2 rounded-xl font-bold text-sm active:scale-95 transition-all whitespace-nowrap"><Icons.Skip size={18}/> ข้าม</button>
                                                     <button onClick={() => updateStatus(currentServing.id, 'cancelled')} className="flex items-center justify-center gap-1 bg-white border border-red-200 text-red-500 hover:bg-red-50 px-3 py-2 rounded-xl font-bold text-sm active:scale-95 transition-all whitespace-nowrap"><Icons.Cross size={18}/> ยกเลิก</button>
                                                 </div>
-                                                {/* Pass Date.now() when status changes to 'completed' (Request 1.3) */}
+                                                {/* Pass Date.now() when status changes to 'completed' */}
                                                 <button onClick={() => updateStatus(currentServing.id, 'completed', Date.now())} className="w-full flex items-center justify-center gap-2 bg-green-500 text-white px-4 py-2 rounded-xl font-bold text-lg shadow-lg shadow-green-200 hover:bg-green-600 active:scale-95 transition-all"><Icons.Check/> เสร็จสิ้น</button>
                                             </div>
                                         </div>
@@ -2500,19 +2498,11 @@
                                     <div className="space-y-3">
                                         <button onClick={() => setShowHistory('all')} className="w-full flex justify-between items-center p-4 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors">
                                             <span className="text-slate-600 font-medium">ทั้งหมด</span>
-                                            {/* Request 2.5: Use text-2xl font-black */}
                                             <span className="text-2xl font-black text-slate-800">{queues.length}</span>
                                         </button>
-                                        <button onClick={() => setShowHistory('completed')} className="w-full flex justify-between items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors text-green-700">
-                                            <span className="font-medium flex items-center gap-2"><Icons.History size={16}/> เสร็จสิ้น</span>
-                                            {/* Request 2.5: Use text-2xl font-black */}
-                                            <span className="text-2xl font-black">{queues.filter(q => q.status==='completed').length}</span>
-                                        </button>
-                                        <button onClick={() => setShowHistory('cancelled')} className="w-full flex justify-between items-center p-4 bg-red-50 hover:bg-red-100 rounded-xl transition-colors text-red-700">
-                                            <span className="font-medium flex items-center gap-2"><Icons.History size={16}/> ยกเลิก</span>
-                                            {/* Request 2.5: Use text-2xl font-black */}
-                                            <span className="text-2xl font-black">{queues.filter(q => q.status==='cancelled').length}</span>
-                                        </button>
+                                        {/* FIXED: Admin Summary Boxes - text-2xl font-black */}
+                                        <button onClick={() => setShowHistory('completed')} className="w-full flex justify-between items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors text-green-700"><span className="font-medium flex items-center gap-2"><Icons.History size={16}/> เสร็จสิ้น</span><span className="text-2xl font-black">{queues.filter(q => q.status==='completed').length}</span></button>
+                                        <button onClick={() => setShowHistory('cancelled')} className="w-full flex justify-between items-center p-4 bg-red-50 hover:bg-red-100 rounded-xl transition-colors text-red-700"><span className="font-medium flex items-center gap-2"><Icons.History size={16}/> ยกเลิก</span><span className="text-2xl font-black">{queues.filter(q => q.status==='cancelled').length}</span></button>
                                     </div>
                                 </div>
                             </div>
@@ -2958,10 +2948,11 @@
                             <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in h-[80vh] flex flex-col">
                                 <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                                     <div className="flex items-center gap-3">
+                                        {/* FIXED: History Modal Title - Show item count */}
                                         <h2 className="font-bold text-xl flex items-center gap-2">
                                             <Icons.History/> 
-                                            {/* Request 2.1: แสดงจำนวนรายการ */}
-                                            {listTitle} ({historyList.length} รายการ)
+                                            {showHistory === 'all' ? 'ประวัติทั้งหมด' : (showHistory === 'completed' ? 'รายการเสร็จสิ้น' : 'รายการยกเลิก')}
+                                            <span className="text-base text-slate-500 font-medium ml-1">({historyList.length} รายการ)</span>
                                         </h2>
                                         {showHistory === 'all' && (
                                             <button onClick={() => setShowClearPopup(true)} className="text-xs text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
@@ -2971,57 +2962,46 @@
                                     </div>
                                     <button onClick={() => setShowHistory(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><Icons.Cross/></button>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                    {historyList.length > 0 ? historyList.map(q => {
-                                        const statusInfo = getStatusClasses(q.status);
-                                        // Request 2.3: คำนวณ Duration
-                                        const durationDisplay = q.status === 'completed' && q.durationMs !== undefined && q.durationMs > 0 ? formatDuration(q.durationMs) : '-';
-                                        
-                                        return (
-                                            <div key={q.id} className="flex flex-col p-4 bg-white rounded-xl shadow-md border border-slate-100 hover:bg-slate-50 transition-colors">
-                                                
-                                                {/* Row 1: Queue/Name/Status (Request 2.2) */}
-                                                <div className="flex justify-between items-start border-b border-slate-100 pb-2 mb-2">
-                                                    <div className="font-bold text-lg text-slate-800 flex items-center gap-3">
-                                                        <span className="text-2xl font-black text-indigo-600">{q.number}</span>
-                                                        <span className="text-slate-700">{q.name}</span>
-                                                        <button onClick={() => setShowEditPopup({ queue: q })} className="text-slate-400 hover:text-indigo-600"><Icons.Edit size={16}/></button>
-                                                    </div>
-                                                    {/* Status Badge */}
-                                                    <div className={`px-3 py-1 text-xs font-bold rounded-full ${statusInfo.bg} ${statusInfo.text} flex-shrink-0`}>
-                                                        {statusInfo.label}
+                                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                                    {historyList.length > 0 ? historyList.map(q => (
+                                        <div key={q.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-100 transition-colors">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-xl font-black text-indigo-600">{q.number}</div>
+                                                    <div className="font-medium text-slate-800 flex items-center gap-2">
+                                                        คุณ {q.name}
+                                                        {getStatusBadge(q.status)}
                                                     </div>
                                                 </div>
-
-                                                {/* Row 2: Timestamps (Request 2.3) */}
-                                                <div className="grid grid-cols-2 sm:grid-cols-4 text-xs gap-3 text-slate-500">
-                                                    <div className="col-span-1">
-                                                        <div className="font-bold">เวลาจอง:</div>
-                                                        <div className="text-slate-700">{formatDateTime(q.createdAt)}</div>
-                                                    </div>
-                                                    <div className="col-span-1">
-                                                        <div className="font-bold">เริ่มบริการ:</div>
-                                                        <div className="text-slate-700">{q.calledAt ? formatDateTime(q.calledAt) : 'N/A'}</div>
-                                                    </div>
-                                                    <div className="col-span-1">
-                                                        <div className="font-bold">เสร็จสิ้น:</div>
-                                                        <div className={`${q.completedAt ? 'text-green-700 font-bold' : 'text-slate-700'}`}>{q.completedAt ? formatDateTime(q.completedAt) : 'N/A'}</div>
-                                                    </div>
-                                                    {/* Duration */}
-                                                    <div className="col-span-1">
-                                                        <div className="font-bold">ใช้เวลา:</div>
-                                                        <div className="text-indigo-600 font-bold">{durationDisplay}</div>
-                                                    </div>
-                                                </div>
-                                                
-                                                {/* Row 3: Action Buttons */}
-                                                <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 justify-end">
-                                                    <button onClick={() => handleRecall(q.id)} className="text-sm bg-white border border-slate-200 px-3 py-1 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 shadow-sm">เรียกซ้ำ</button>
-                                                    <button onClick={() => setShowConfirmPopup({ id: q.id, type: 'delete' })} className="text-sm bg-white border border-red-200 text-red-400 px-2 py-1 rounded-lg hover:bg-red-50 hover:text-red-600 shadow-sm"><Icons.Trash size={16}/></button>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => setShowEditPopup({ queue: q })} className="text-slate-400 hover:text-indigo-600 p-1 rounded-full hover:bg-slate-200"><Icons.Edit size={16}/></button>
+                                                    <button onClick={() => setShowConfirmPopup({ id: q.id, type: 'delete' })} className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-100"><Icons.Trash size={16}/></button>
                                                 </div>
                                             </div>
-                                        );
-                                    }) : <div className="text-center text-slate-400 mt-10">ไม่มีข้อมูล</div>}
+                                            
+                                            {/* FIXED: Time Details Table */}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-slate-600 mt-2 border-t border-slate-100 pt-2">
+                                                <div className="col-span-2 md:col-span-1">
+                                                    <div className="text-slate-400">จองคิว</div>
+                                                    <div className="font-medium">{formatDateTime(q.createdAt)}</div>
+                                                </div>
+                                                <div className="col-span-2 md:col-span-1">
+                                                    <div className="text-slate-400">เริ่มบริการ</div>
+                                                    <div className="font-medium">{q.calledAt ? formatDateTime(q.calledAt) : '--'}</div>
+                                                </div>
+                                                <div className="col-span-2 md:col-span-1">
+                                                    <div className="text-slate-400">เสร็จสิ้น</div>
+                                                    <div className="font-medium">{q.completedAt ? formatDateTime(q.completedAt) : '--'}</div>
+                                                </div>
+                                                <div className="col-span-2 md:col-span-1">
+                                                    <div className="text-slate-400">ใช้เวลา</div>
+                                                    <div className="font-bold text-indigo-600">{formatDuration(q.durationMs)}</div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* REMOVED: q.note และ q.skipCount display from history list item */}
+                                        </div>
+                                    )) : <div className="text-center text-slate-400 mt-10">ไม่มีข้อมูล</div>}
                                 </div>
                             </div>
                         </div>
