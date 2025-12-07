@@ -1,3 +1,6 @@
+{
+type: file
+content:
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -80,14 +83,29 @@
 
         const initFirebase = () => {
             let config;
+            let setupError = false;
+            let errorMessage = '';
+
             if (YOUR_FIREBASE_CONFIG.apiKey === "วาง_API_KEY_ที่นี่" || YOUR_FIREBASE_CONFIG.apiKey === "") {
                  if (typeof __firebase_config !== 'undefined') {
-                    config = JSON.parse(__firebase_config);
+                    // Use environment config if available
+                    try {
+                        config = JSON.parse(__firebase_config);
+                    } catch (e) {
+                        setupError = true;
+                        errorMessage = "Invalid __firebase_config format.";
+                    }
                  } else {
-                    throw new Error("PLEASE_SETUP_FIREBASE");
+                    setupError = true;
+                    errorMessage = "Firebase API Key is missing and environment config is unavailable.";
                  }
             } else {
                 config = YOUR_FIREBASE_CONFIG;
+            }
+
+            if (setupError) {
+                // Return error state instead of throwing an unhandled error
+                return { setupError: true, errorMessage };
             }
 
             if (!firebase.apps.length) {
@@ -95,7 +113,8 @@
                     firebase.initializeApp(config);
                 } catch (e) {
                     console.error("Firebase init failed", e);
-                    throw e;
+                    // Handle init failure, which might happen if config is bad
+                    return { setupError: true, errorMessage: "Firebase initialization failed: " + e.message };
                 }
             }
             return {
@@ -345,7 +364,7 @@
         const formatDuration = (durationMs) => {
             if (typeof durationMs !== 'number' || durationMs <= 0) return '--';
             const totalSeconds = Math.floor(durationMs / 1000);
-            const hours = Math.floor((totalSeconds % 3600) / 3600);
+            const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
             const seconds = totalSeconds % 60;
             
@@ -543,6 +562,7 @@
             // QR Code Dynamic Token States (NEW)
             const [qrToken, setQrToken] = useState(() => localStorage.getItem('qr_token') || crypto.randomUUID());
             const [qrExpireEnabled, setQrExpireEnabled] = useState(false);
+            // FIXED: Initial state can be 0 (infinite)
             const [qrExpireTime, setQrExpireTime] = useState(5); // Minutes
             const [qrTokenExpiry, setQrTokenExpiry] = useState(null);
             const [qrCountdown, setQrCountdown] = useState(0);
@@ -580,20 +600,20 @@
             };
 
             // Helper function to update the QR token and expiry in Firestore
+            // MODIFIED: Logic handles expiryMinutes = 0 as infinite (null expiry time)
             const updateQrTokenInFirestore = async (newQrToken, expiryMinutes, isManual = false) => {
                 if (!services?.db || !user) return;
                 
-                // If expiryMinutes is 0 or less, set tokenExpiry to null (infinite)
-                const effectiveExpiryMinutes = parseInt(expiryMinutes) || 0;
                 const now = Date.now();
-                const tokenExpiry = effectiveExpiryMinutes > 0 ? now + (effectiveExpiryMinutes * 60 * 1000) : null;
+                // If expiryMinutes is 0, set tokenExpiry to null (infinite)
+                const tokenExpiry = expiryMinutes > 0 ? now + (expiryMinutes * 60 * 1000) : null;
 
                 try {
                     let settingsRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
                     await settingsRef.set({ 
                         qrToken: newQrToken, 
                         qrTokenExpiry: tokenExpiry,
-                        qrExpireTime: effectiveExpiryMinutes, // Save the interval setting
+                        qrExpireTime: expiryMinutes, // Save the interval setting
                     }, { merge: true });
                     
                     setQrToken(newQrToken);
@@ -823,7 +843,7 @@
             // --- Handle Audio Enable ---
             const handleEnableAudio = () => {
                 initGlobalAudio();
-                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
+                const silentAudio = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVAAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////wAAAAD/84QAAAAAExAAAAAAAAABAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA//OEWoAAAB9AAAACABAAAAAAAAAAAAAA";
                 const audio = new Audio(silentAudio);
                 
                 audio.play().then(() => { 
@@ -913,27 +933,38 @@
             }, [showScanner, queues]);
 
             useEffect(() => {
-                try {
-                    const { auth, db } = initFirebase();
-                    setServices({ auth, db });
-                    const unsubAuth = auth.onAuthStateChanged(async (u) => {
-                        if (u) { setUser(u); } else {
-                            try {
-                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                    try { await auth.signInWithCustomToken(__initial_auth_token); } catch { await auth.signInAnonymously(); }
-                                } else { await auth.signInAnonymously(); }
-                            } catch (authErr) { setErrorMsg("Auth Error: " + authErr.message); setConfigError(true); setLoading(false); }
-                        }
-                    });
-                    const params = new URLSearchParams(window.location.search);
-                    const mode = params.get('mode');
-                    if (mode === 'kiosk') setViewMode('kiosk');
-                    if (mode === 'display') setViewMode('display');
-                    // NEW: Add QR-only mode
-                    if (mode === 'qr-only') setViewMode('qr-only');
-                    return () => unsubAuth();
-                } catch (err) { setErrorMsg(err.message); setConfigError(true); setLoading(false); }
-            }, []);
+                // MODIFIED: Check for setupError before continuing
+                const firebaseResult = initFirebase();
+
+                if (firebaseResult.setupError) {
+                    setErrorMsg(firebaseResult.errorMessage);
+                    setConfigError(true);
+                    setLoading(false);
+                    return; // Stop initialization process
+                }
+
+                const { auth, db } = firebaseResult;
+                setServices({ auth, db });
+                
+                const unsubAuth = auth.onAuthStateChanged(async (u) => {
+                    if (u) { setUser(u); } else {
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                try { await auth.signInWithCustomToken(__initial_auth_token); } catch { await auth.signInAnonymously(); }
+                            } else { await auth.signInAnonymously(); }
+                        } catch (authErr) { setErrorMsg("Auth Error: " + authErr.message); setConfigError(true); setLoading(false); }
+                    }
+                });
+                const params = new URLSearchParams(window.location.search);
+                const mode = params.get('mode');
+                if (mode === 'kiosk') setViewMode('kiosk');
+                if (mode === 'display') setViewMode('display');
+                // NEW: Add QR-only mode
+                if (mode === 'qr-only') setViewMode('qr-only');
+                return () => unsubAuth();
+
+            }, []); // Empty dependency array ensures this runs only once
+
 
             useEffect(() => { if (showSkipPopup && skipInputRef.current) setTimeout(() => skipInputRef.current?.focus({ preventScroll: true }), 50); }, [showSkipPopup]);
             useEffect(() => { if (showClearPopup) { setClearPassword(''); setTimeout(() => clearInputRef.current?.focus({ preventScroll: true }), 50); } }, [showClearPopup]);
@@ -982,7 +1013,8 @@
                         
                         // QR Settings (NEW)
                         if (data.qrExpireEnabled !== undefined) setQrExpireEnabled(data.qrExpireEnabled);
-                        if (data.qrExpireTime !== undefined) setQrExpireTime(data.qrExpireTime);
+                        // MODIFIED: Load value as is, including 0
+                        if (data.qrExpireTime !== undefined) setQrExpireTime(data.qrExpireTime); 
                         if (data.qrToken) setQrToken(data.qrToken);
                         if (data.qrTokenExpiry !== undefined) setQrTokenExpiry(data.qrTokenExpiry);
                         
@@ -1017,7 +1049,7 @@
                     // 1. Calculate the base average service time once
                     const completedQueues = queues
                         .filter(q => q.status === 'completed' && q.calledAt && q.completedAt && typeof q.durationMs === 'number' && q.durationMs > 0)
-                        .sort((a, b) => b.completedAt - a.completedAt); 
+                        .sort((a, b) => b.completedAt - a.createdAt); 
 
                     let totalServiceTime = 0;
                     const limit = aiQueueTimeHistoryLimit || 5;
@@ -1113,26 +1145,37 @@
             // --- QR Code Auto-Update Logic (Display Mode/Admin Mode) ---
             useEffect(() => {
                 let interval = null;
+                const expiryMinutes = Number(qrExpireTime);
+
                 const updateToken = () => {
-                    // Only run if qrExpireEnabled is true AND qrExpireTime > 0
-                    if (services && user && qrExpireEnabled && qrExpireTime > 0) {
+                    // Condition 1: Expiration is enabled AND time is NOT infinite (expiryMinutes > 0)
+                    if (services && user && qrExpireEnabled && expiryMinutes > 0) {
                         const now = Date.now();
                         const expiry = qrTokenExpiry || 0;
-                        const expiryMs = qrExpireTime * 60 * 1000;
-                        const timeSinceLastUpdate = now - (expiry - expiryMs);
+                        const expiryMs = expiryMinutes * 60 * 1000;
+                        // Use expiryMs here to calculate the time passed since the token was created
+                        const timeSinceLastUpdate = now - (expiry - expiryMs); 
                         
-                        // If expired or within 1 second of interval starting time, generate new token
+                        // If expired or time since last update exceeds the interval, generate new token
                         if (!qrTokenExpiry || expiry <= now || timeSinceLastUpdate >= expiryMs) {
                             const newToken = generateUniqueToken();
-                            console.log(`Generating new QR token: ${newToken}`);
-                            updateQrTokenInFirestore(newToken, qrExpireTime);
+                            console.log(`[QR] Generating new expiring token: ${newToken}`);
+                            updateQrTokenInFirestore(newToken, expiryMinutes);
                         }
+                    } 
+                    // Condition 2: Expiration is enabled AND time IS infinite (expiryMinutes = 0) 
+                    // AND token is missing. Generate a permanent token once.
+                    else if (services && user && qrExpireEnabled && expiryMinutes === 0 && !qrToken) {
+                         const newToken = generateUniqueToken();
+                         console.log(`[QR] Generating new infinite token: ${newToken}`);
+                         updateQrTokenInFirestore(newToken, 0); // Send 0 to set expiry to null
                     }
                 };
 
                 // Update countdown every second
                 interval = setInterval(() => {
-                    if (qrExpireEnabled && qrExpireTime > 0 && qrTokenExpiry) {
+                    // Condition: Only count down if expiration is enabled AND time is NOT infinite (expiryMinutes > 0)
+                    if (qrExpireEnabled && qrTokenExpiry && expiryMinutes > 0) {
                         const now = Date.now();
                         const remaining = qrTokenExpiry - now;
                         setQrCountdown(Math.max(0, Math.floor(remaining / 1000)));
@@ -1141,16 +1184,15 @@
                              updateToken(); // Generate new token when countdown hits zero
                         }
                     } else {
-                        // If expiration is disabled or time is 0, reset countdown
                         setQrCountdown(0);
                     }
                 }, 1000);
 
-                // Run once on mount to check if token needs refresh
+                // Run once on mount to check if token needs refresh/generation
                 updateToken();
 
                 return () => clearInterval(interval);
-            }, [services, user, qrExpireEnabled, qrExpireTime, qrTokenExpiry]);
+            }, [services, user, qrExpireEnabled, Number(qrExpireTime), qrTokenExpiry]);
             
             const formatCountdown = (seconds) => {
                 const totalSeconds = Math.max(0, Math.floor(seconds));
@@ -1189,20 +1231,16 @@
 
                             // Only update state if mapping has changed 
                             setExternalLinkMapping(prev => {
-                                if (prev !== mappingString && isManualSync) {
-                                    // Log silent update, but don't toast
-                                    console.log("GAS mapping silently updated.");
+                                // isManualSync is not available here, so we skip the silent update logging
+                                if (prev !== mappingString) {
+                                    // console.log("GAS mapping silently updated.");
                                 }
                                 return mappingString;
                             });
                             
                             setLastGasSyncTime(currentTime); // Update sync time
 
-                            // Only save to Firestore if it's a manual sync (to prevent excessive writes)
-                            if (isManualSync && user && services) {
-                                let docRef = (typeof __app_id !== 'undefined') ? services.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('main') : services.db.collection('settings').doc('main');
-                                await docRef.set({ externalLinkMapping: mappingString, lastGasSyncTime: currentTime }, { merge: true });
-                            }
+                            // No Firestore save in silent sync
                         } else {
                             console.warn("GAS data format invalid for silent sync.");
                         }
@@ -1258,10 +1296,10 @@
                 const params = new URLSearchParams(window.location.search);
                 const kioskToken = params.get('queue_token');
                 
-                if (qrExpireEnabled) {
+                // Check if QR Expiration is enabled AND not set to infinite (qrExpireTime > 0)
+                if (qrExpireEnabled && Number(qrExpireTime) > 0) {
                      // Check if token is present, if it matches the current token, and if it has not expired
-                     // Only check expiry if expiration is actually enabled AND the expiry time is set (i.e., > 0)
-                     if (qrExpireTime > 0 && (!kioskToken || kioskToken !== qrToken || (qrTokenExpiry && Date.now() > qrTokenExpiry))) {
+                     if (!kioskToken || kioskToken !== qrToken || (qrTokenExpiry && Date.now() > qrTokenExpiry)) {
                          showToastFn("QR Code หมดอายุแล้ว กรุณาสแกนใหม่", 'error');
                          setCustomerName('');
                          return;
@@ -1582,15 +1620,16 @@
             const handleSaveSettings = async () => {
                 if (!user || !services) return;
                 
-                // Get expiry time input, treat 0 or empty as infinite (setting value is 0)
-                const inputExpireTime = parseInt(qrExpireTime) || 0;
-                
-                // If QR expiration is enabled AND expiry time is > 0, ensure token is generated/updated
-                if (qrExpireEnabled && inputExpireTime > 0 && !qrToken) {
-                    const newToken = generateUniqueToken();
-                    await updateQrTokenInFirestore(newToken, inputExpireTime);
-                }
+                // MODIFIED: Handle 0 or empty string as 0 (Infinite)
+                const expiryTimeToSave = Number(qrExpireTime) || 0;
 
+                // If QR expiration is enabled, ensure token is generated and saved if missing
+                if (qrExpireEnabled && !qrToken) {
+                    const newToken = generateUniqueToken();
+                    // Pass the newly calculated expiryTimeToSave (0 for infinite)
+                    await updateQrTokenInFirestore(newToken, expiryTimeToSave);
+                }
+                
                 const durationToSave = parseInt(adminSessionDuration) > 0 ? parseInt(adminSessionDuration) : 60;
                 const historyLimitToSave = parseInt(aiQueueTimeHistoryLimit) > 0 ? parseInt(aiQueueTimeHistoryLimit) : 5;
 
@@ -1611,7 +1650,8 @@
                         lastSentLink: lastSentLink, // NEW: Save last successful sent link for persistence
                         // QR Settings (NEW)
                         qrExpireEnabled: qrExpireEnabled,
-                        qrExpireTime: inputExpireTime, // Save the actual input value
+                        // MODIFIED HERE: Save 0 for infinite, >0 for expiration
+                        qrExpireTime: expiryTimeToSave, 
                         // Admin Session Duration Setting Save
                         adminSessionDuration: durationToSave,
                         // --- AI Time Estimation Setting Save ---
@@ -1632,8 +1672,8 @@
                 const url = new URL(window.location.href); 
                 url.searchParams.set('mode', 'kiosk'); 
                 
-                // Add token if expiration is enabled and token exists
-                if(qrExpireEnabled && qrExpireTime > 0 && qrToken) {
+                // MODIFIED: Only add token if expiration is enabled AND time is NOT infinite (qrExpireTime > 0)
+                if(qrExpireEnabled && qrToken && Number(qrExpireTime) > 0) {
                     url.searchParams.set('queue_token', qrToken);
                 } else {
                     url.searchParams.delete('queue_token');
@@ -1646,14 +1686,13 @@
                 const url = new URL(window.location.href); 
                 url.searchParams.set('mode', 'qr-only'); 
                 
-                // Add token if expiration is enabled and expiry time is > 0
-                if(qrExpireEnabled && qrExpireTime > 0 && qrToken) {
+                // MODIFIED: Only add token if expiration is enabled AND time is NOT infinite (qrExpireTime > 0)
+                if(qrExpireEnabled && qrToken && Number(qrExpireTime) > 0) {
                     url.searchParams.set('queue_token', qrToken);
                 } else {
                     url.searchParams.delete('queue_token');
                 }
                 
-                // FIXED: Ensure opening in a new window/tab as requested by the user's scenario
                 window.open(url.toString(), '_blank'); 
             };
 
@@ -1722,10 +1761,11 @@
             const kioskUrl = new URL(window.location.href);
             kioskUrl.search = '';
             kioskUrl.searchParams.set('mode', 'kiosk');
-            if(qrExpireEnabled && qrExpireTime > 0 && qrToken) {
+            // MODIFIED: Only add token if expiration is enabled AND time is NOT infinite (qrExpireTime > 0)
+            if(qrExpireEnabled && qrToken && Number(qrExpireTime) > 0) {
                  kioskUrl.searchParams.set('queue_token', qrToken);
             } else {
-                kioskUrl.searchParams.delete('queue_token');
+                 kioskUrl.searchParams.delete('queue_token');
             }
             // The URL used for the QR code image generation
             const qrCodeData = kioskUrl.toString(); 
@@ -1756,8 +1796,8 @@
                             
                             <p className="text-lg font-medium text-slate-800 mb-1">คิวปัจจุบัน: <span className="font-bold text-indigo-600">{currentServing ? currentServing.number : '--'}</span></p>
                             
-                            {/* FIXED: แสดงสถานะการหมดอายุตามที่ตั้งค่า */}
-                            {qrEnabled && qrExpireEnabled && qrExpireTime > 0 && qrTokenExpiry ? (
+                            {/* MODIFIED: แสดงสถานะการหมดอายุตามที่ตั้งค่า (Request 2) */}
+                            {qrEnabled && qrExpireEnabled && Number(qrExpireTime) > 0 && qrTokenExpiry ? (
                                 <div className="text-sm font-bold text-red-500 mt-2 flex items-center justify-center">
                                     <Icons.Clock size={16} className="inline-block mr-1"/> QR Code เปลี่ยนใหม่ใน: {formatCountdown(qrCountdown)}
                                 </div>
@@ -2107,6 +2147,209 @@
                                  </div>
                             </div>
                         )}
+                    </div>
+                );
+            }
+
+            // ===============================================
+            // DISPLAY MODE LOGIC (Restored old 2-column layout)
+            // ===============================================
+
+            const displayQueues = queues.filter(q => q.status === 'serving' || q.status === 'waiting');
+            const currentDisplayServing = displayQueues.find(q => q.status === 'serving');
+            // Filter out the serving queue from the waiting list, sort by createdAt (oldest first) and take the first 7
+            const waitingForDisplay = displayQueues
+                .filter(q => q.status === 'waiting' && q.id !== currentDisplayServing?.id)
+                .sort((a, b) => a.createdAt - b.createdAt)
+                .slice(0, 7); 
+            
+            // Note: qrCodeData generation is now global (line ~1104)
+
+            if (viewMode === 'display') {
+                
+                // ----------------------------------------------------
+                // START: NEW UI for "ปิดให้บริการ" (If no queues AND service is closed)
+                // ----------------------------------------------------
+                const isSystemClosed = !serviceOpen || (currentDisplayServing === undefined && waitingForDisplay.length === 0);
+                
+                if (isSystemClosed && !serviceOpen) {
+                    return (
+                        <div className="h-screen w-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center overflow-hidden">
+                            {/* FIXED 1: ปรับ div หลักให้เป็น flex และจัดเนื้อหาให้อยู่กึ่งกลาง (justify-center) */}
+                            <div className="text-center w-full max-w-4xl flex flex-col items-center justify-center h-full"> 
+                                <div className="text-5xl font-black mb-8 text-red-500 flex items-center justify-center gap-4">
+                                    <Icons.Power size={60} className="text-red-500 animate-pulse"/>
+                                    ระบบปิดให้บริการชั่วคราว
+                                </div>
+                                <div className="text-[12rem] md:text-[18rem] font-black leading-none tracking-tight text-red-700/50 mb-10">
+                                    CLOSED
+                                </div>
+                                {/* FIXED 2: ใช้ mx-auto เพื่อจัด span ให้อยู่กึ่งกลาง แต่ไม่ต้องเพิ่ม div หุ้ม */}
+                                <span className="text-4xl md:text-5xl font-bold block text-white mx-auto">
+                                    {closedReason || 'ปิดให้บริการเพื่อปรับปรุงระบบ'}
+                                </span>
+                                <div className="mt-8 text-2xl md:text-3xl text-red-300 font-bold">
+                                    กรุณาติดต่อช่องบริการในภายหลัง
+                                </div>
+                            </div>
+                            <div className="absolute bottom-4 left-4 text-xs text-slate-500">Q-Master Display Mode</div>
+                        </div>
+                    );
+                }
+                // ----------------------------------------------------
+                // END: NEW UI for "ปิดให้บริการ"
+                // ----------------------------------------------------
+                
+                 return (
+                    // FIXED: 1. เปลี่ยน min-h-screen เป็น h-screen และเพิ่ม flex-col
+                    <div className="h-screen bg-slate-900 text-white p-4 sm:p-8 flex flex-col w-full overflow-hidden">
+                        
+                        {/* FIXED: 2. ส่วนหัว ถูกย้ายมาอยู่ด้านบนสุดและใช้พื้นที่คงที่ (flex-shrink-0) */}
+                        {/* FIXED: ใช้ max-w-full เพื่อให้ยืดเต็มจอ */}
+                        <div className="w-full max-w-full mx-auto px-0 flex-shrink-0 text-center mb-4 sm:mb-6">
+                            <h1 className="text-4xl sm:text-6xl font-black mb-2 text-indigo-400">ระบบแสดงคิวบริการ</h1>
+                            <p className="xl text-slate-400">Queue & Calling Display</p>
+                        </div>
+                        
+                        {/* FIXED: 3. Layout: ใช้ flex-1 และ gap-6 เพื่อให้ขยายเต็มพื้นที่ที่เหลือ และใช้ max-w-full */}
+                        <div className="flex-1 w-full max-w-full mx-auto flex flex-col lg:flex-row gap-4 sm:gap-6 overflow-hidden"> 
+                            
+                            {/* LEFT COLUMN: CALLING NOW SECTION (เน้นใหญ่) */}
+                            {/* FIXED: ให้ใช้พื้นที่ 2/3 (lg:w-2/3) และขยายความสูงเต็ม (h-full) */}
+                            <div className="w-full lg:w-2/3 bg-gradient-to-br from-indigo-700 to-purple-800 rounded-3xl shadow-2xl flex flex-col items-center justify-center text-white relative overflow-hidden p-6 sm:p-10 h-full"> 
+                                {!audioEnabled && (
+                                    <button onClick={handleEnableAudio} className="absolute top-4 right-4 bg-white/20 px-4 py-2 rounded-full text-sm flex gap-2 z-50 hover:bg-white/30 transition-all">
+                                        <Icons.Volume size={16}/> คลิกเพื่อเปิดเสียงพูด
+                                    </button>
+                                )}
+                                
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+                                
+                                {/* FIXED 1: Dynamic Title based on service status (Removed serviceOpen check here as it's now handled by the outer block) */}
+                                <h2 className="2xl sm:text-3xl font-medium text-indigo-200 mb-8 uppercase tracking-widest">
+                                     หมายเลขคิวปัจจุบัน
+                                </h2>
+                                
+                                {/* FIXED 1: Logic Block - Current Serving Queue UI */}
+                                {currentDisplayServing ? (
+                                    <div className="text-center w-full"> 
+                                        {/* แก้ไข 1.1: ลดขนาดหมายเลขคิว */}
+                                        <div className="text-7xl md:text-[8rem] lg:text-[12rem] font-black leading-none tracking-normal drop-shadow-lg text-white">
+                                            {currentDisplayServing.number}
+                                        </div>
+                                        {/* FIXED: ลดขนาดตัวอักษรเป็น text-3xl md:text-5xl (ตามที่ผู้ใช้แจ้ง) และลบ py-4 ออกจาก div หุ้ม แล้วย้าย py-2 ไปที่ span */}
+                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-6 rounded-full inline-block mx-auto max-w-full">
+                                            {/* บรรทัด 1324 */}
+                                            <span className="text-3xl md:text-5xl font-bold block whitespace-nowrap overflow-hidden text-ellipsis py-4">คุณ {currentDisplayServing.name}</span>
+                                        </div>
+                                        <div className="mt-10 text-2xl md:text-4xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
+                                    </div>
+                                ) : (
+                                    <div className="text-center opacity-40">
+                                        <div className="text-8xl md:text-9xl font-black">---</div>
+                                        <div className="text-2xl mt-4 text-indigo-200">ไม่มีคิวเรียก (รอคิวถัดไป)</div>
+                                    </div>
+                                )}
+                                
+                            </div>
+                            
+                            {/* RIGHT COLUMN: WAITING QUEUES LIST */}
+                            {/* FIXED: เพิ่ม relative เพื่อให้ QR Code ที่ absolute ใช้งานได้ */}
+                            <div className="w-full lg:w-1/3 bg-slate-800 rounded-3xl shadow-xl flex flex-col overflow-hidden flex-shrink-0 lg:h-full relative">
+                                
+                                <div className="p-4 sm:p-6 bg-slate-700 border-b border-slate-600 font-bold text-slate-300 flex items-center justify-between flex-shrink-0">
+                                    <div className="text-xl flex items-center gap-2">
+                                        <Icons.Clock size={24} className="text-indigo-400" /> คิวถัดไป
+                                    </div>
+                                    <span className="text-md font-normal text-indigo-300">{waitingForDisplay.length} รายการ</span>
+                                </div>
+                                
+                                {/* FIXED: ทำให้ส่วนนี้ scroll ได้และใช้ flex-1 */}
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scroll"> 
+                                    {waitingForDisplay.length > 0 ? (
+                                        waitingForDisplay.map((q, index) => {
+                                            const isSkipped = q.skipCount > 0 || q.note;
+                                            const etaSeconds = etaMap[q.id];
+                                            const showEta = aiQueueTimeEnabled && etaSeconds !== undefined && etaSeconds !== null && etaSeconds > 0;
+                                            return (
+                                            <div key={q.id} className="flex flex-col p-4 bg-slate-700 rounded-xl border border-slate-600 shadow-lg">
+                                                
+                                                {/* Line 1: Queue Number (Left) and Estimated Time (Right) */}
+                                                <div className="flex items-center justify-between">
+                                                    {/* แก้ไข 1.3: ลดขนาดหมายเลขคิวที่รอคิว */}
+                                                    <div className="text-2xl font-black text-indigo-300 whitespace-nowrap">{q.number}</div>
+                                                    
+                                                    {/* NEW: Estimated Time per queue */}
+                                                    {showEta ? (
+                                                        <div className="text-sm text-green-400 font-bold flex items-center">
+                                                            <Icons.Time size={14} className="mr-1"/> 
+                                                            {formatSecondsToMinutes(etaSeconds)}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-sm text-slate-500">{index + 1} คิวถัดไป</div>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* Line 2: Customer Name (Left) and Date/Time (Right) */}
+                                                <div className="flex items-end justify-between mt-1 pb-1">
+                                                    {/* แก้ไข 1.4: ลดขนาดชื่อลูกค้าที่รอคิว */}
+                                                    <div className="text-base font-medium text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[70%]">{q.name}</div>
+                                                    {/* FIXED: แสดงวันที่และเวลา */}
+                                                    <span className="text-xs text-indigo-200 block font-medium flex-shrink-0">{formatDateTime(q.createdAt)}</span>
+                                                </div>
+                                                
+                                                {/* Line 3: Note (Full Width with Divider) */}
+                                                {(q.note || q.skipCount > 0) && (
+                                                    // ใช้ flex-shrink-0 เพื่อให้แน่ใจว่าข้อความหมายเหตุจะไม่ถูกบีบ
+                                                    // border-t border-slate-600 เพื่อสร้างเส้นแบ่งจางๆ
+                                                    <div className="mt-2 pt-2 border-t border-slate-600 flex-shrink-0"> 
+                                                        <span className="text-sm font-bold text-red-400 block break-words">
+                                                            {/* FIXED: ใช้ break-words เพื่อให้ข้อความยาว ๆ ขึ้นบรรทัดใหม่ได้ */}
+                                                            {q.note ? `หมายเหตุ: ${q.note}` : `ถูกข้าม (${q.skipCount} ครั้ง)`}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                
+                                            </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="text-center py-10 text-slate-500">ไม่มีคิวรอเรียก</div>
+                                    )}
+                                </div>
+
+                                {/* แก้ไข 3: พื้นหลัง QR Code แบบเบลอ (backdrop-blur) */}
+                                {(qrEnabled || qrExpireEnabled) && (
+                                    <div className="absolute bottom-0 right-0 p-4 z-10"> 
+                                        {/* แก้ไข 3: เพิ่ม backdrop-blur, bg-white/85, rounded-xl */}
+                                        <div className="backdrop-blur-sm bg-white/85 rounded-xl shadow-2xl p-3 text-center border border-white/90">
+                                            
+                                            {/* FIXED: ข้อความกำกับ (เปลี่ยนสีเป็น slate-800) */}
+                                            <div className="text-xs font-bold text-slate-800 mb-1">สแกนเพื่อจองคิว</div>
+                                            
+                                            <img 
+                                                // FIXED: ใช้ qrCodeData ที่ encodeURIComponent แล้ว
+                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrCodeData)}`} 
+                                                alt="Queue QR Code" 
+                                                // ลบ mix-blend-lighten, opacity ออก
+                                                className="w-24 h-24 sm:w-28 sm:h-28 rounded-md mx-auto" 
+                                                key={qrToken} // Re-render image when token changes, even if expiration is off
+                                            />
+                                            
+                                            {/* MODIFIED: แสดงสถานะการหมดอายุ (Request 2) */}
+                                            {qrEnabled && qrExpireEnabled && Number(qrExpireTime) > 0 && qrTokenExpiry && (
+                                                <div className="text-[10px] text-red-600 mt-1 font-mono font-bold flex items-center justify-center animate-pulse">
+                                                    <Icons.Clock size={10} className="inline-block mr-0.5"/> หมดอายุใน: {formatCountdown(qrCountdown)}
+                                                </div>
+                                            )}
+                                            {/* END NEW QR CODE TIMER */}
+                                        </div>
+                                    </div>
+                                )}
+                                {/* END NEW QR CODE LOCATION */}
+
+                            </div>
+                        </div>
                     </div>
                 );
             }
@@ -2525,20 +2768,33 @@
                                         {qrExpireEnabled && (
                                             <div className="mt-4 space-y-3 border-t border-slate-200 pt-4 animate-fade-in">
                                                 <div>
-                                                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">เปลี่ยน QR Code ทุก (นาที) (0 คือไม่หมดอายุ)</label>
+                                                    {/* MODIFIED: Label text change (Request 3) */}
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1 ml-1">เปลี่ยน QR Code ทุก (นาที)</label>
                                                     <input 
                                                         type="number" 
                                                         min="0" 
+                                                        // MODIFIED: Allows empty string (Request 4)
                                                         value={qrExpireTime} 
-                                                        onChange={e => setQrExpireTime(Math.max(0, parseInt(e.target.value) || 0))} 
+                                                        onChange={e => {
+                                                            const val = e.target.value;
+                                                            if (val === "") {
+                                                                setQrExpireTime(""); // Allow empty string
+                                                            } else {
+                                                                const num = parseInt(val, 10);
+                                                                // Ensure minimum is 0
+                                                                setQrExpireTime(Math.max(0, isNaN(num) ? 0 : num)); 
+                                                            }
+                                                        }} 
                                                         className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" 
-                                                        placeholder="5" 
+                                                        placeholder="0 คือไม่หมดอายุ" 
                                                     />
+                                                     <p className="text-[10px] text-slate-400 mt-1">
+                                                        ใส่ 0 (ศูนย์) หรือเว้นว่างไว้สำหรับ "ไม่หมดอายุ" (Infinite Expiration)
+                                                    </p>
                                                 </div>
                                                 <button 
-                                                    onClick={() => updateQrTokenInFirestore(generateUniqueToken(), qrExpireTime, true)} 
-                                                    disabled={qrExpireTime <= 0 && qrExpireEnabled} // Disable if enabled but time is 0 (infinite)
-                                                    className={`w-full py-2 rounded-lg font-bold transition-colors text-sm flex items-center justify-center gap-2 ${qrExpireTime <= 0 && qrExpireEnabled ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                                                    onClick={() => updateQrTokenInFirestore(generateUniqueToken(), Number(qrExpireTime) || 0, true)} 
+                                                    className="w-full py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors text-sm flex items-center justify-center gap-2" // Added flex items-center justify-center gap-2
                                                 >
                                                     สร้าง QR Code ใหม่ทันที
                                                     {/* NEW: Countdown in Settings Button */}
@@ -2548,14 +2804,16 @@
                                                         </span>
                                                     )}
                                                 </button>
-                                                {qrEnabled && qrExpireEnabled && qrExpireTime > 0 && qrTokenExpiry && (
+                                                {/* MODIFIED: Check Number(qrExpireTime) > 0 for display (Request 2) */}
+                                                {qrEnabled && qrTokenExpiry && Number(qrExpireTime) > 0 && (
                                                      <div className="text-xs text-slate-500 text-center">
                                                          QR Code จะหมดอายุใน: {formatCountdown(qrCountdown)}
                                                      </div>
                                                 )}
-                                                {qrEnabled && qrExpireEnabled && qrExpireTime <= 0 && (
-                                                     <div className="text-xs text-slate-500 text-center text-green-600 font-bold">
-                                                         QR Code ถูกตั้งค่าให้ไม่หมดอายุ
+                                                {/* MODIFIED: Show infinite status */}
+                                                {qrEnabled && Number(qrExpireTime) === 0 && (
+                                                     <div className="text-xs text-green-500 text-center font-bold">
+                                                         QR Code ถูกตั้งค่าเป็น "ไม่หมดอายุ" (Infinite)
                                                      </div>
                                                 )}
                                             </div>
@@ -2644,7 +2902,7 @@
                                                         type="text" 
                                                         value={externalLinkLabel || ''} 
                                                         onChange={e => setExternalLinkLabel(e.target.value)} 
-                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 transition-all" 
+                                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
                                                         placeholder="เปิดเอกสาร" 
                                                     />
                                                 </div>
@@ -2775,10 +3033,10 @@
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
                             <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in h-[80vh] flex flex-col">
                                 
-                                {/* UPDATED: Header for History Modal - Title/Count and Buttons */}
-                                <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-start flex-shrink-0 relative">
+                                {/* UPDATED: Header for History Modal - Combined Title/Count and Buttons/Dropdown */}
+                                <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 flex-shrink-0">
                                     
-                                    {/* Left Side: Title + Item Count (Stacked) */}
+                                    {/* Left Side: Title + Item Count */}
                                     <div className="flex flex-col flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <h2 className="font-bold text-xl flex items-center gap-2">
@@ -2790,8 +3048,8 @@
                                         <span className="text-sm text-slate-500 font-medium ml-1 block">({historyList.length} รายการ)</span>
                                     </div>
                                     
-                                    {/* Right Side Buttons: Clear and Close (Always Top Right) */}
-                                    <div className="flex gap-2 items-start flex-shrink-0 absolute top-4 right-4">
+                                    {/* Right Side Buttons: Clear and Close */}
+                                    <div className="flex gap-2 items-start flex-shrink-0 sm:self-start">
                                         {/* Clear Button */}
                                         {showHistory === 'all' && (
                                             <button onClick={() => setShowClearPopup(true)} className="text-xs text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors font-bold">
@@ -2804,7 +3062,7 @@
 
                                 </div>
                                 
-                                {/* UPDATED: Sorting Dropdown - Separate line, below item count, no external border/padding (uses internal p-1) */}
+                                {/* UPDATED: Sorting Dropdown - Moved to separate line, just below the header block. */}
                                 <div className="px-4 sm:px-6 flex-shrink-0 pt-1 pb-3">
                                     <select 
                                         value={historySort}
@@ -2957,3 +3215,4 @@
     </script>
 </body>
 </html>
+}
