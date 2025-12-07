@@ -1530,7 +1530,7 @@
                             <p className="text-lg font-medium text-slate-800 mb-1">คิวปัจจุบัน: <span className="font-bold text-indigo-600">{currentServing ? currentServing.number : '--'}</span></p>
                             
                             {/* FIXED: แสดงสถานะการหมดอายุตามที่ตั้งค่า */}
-                            {qrExpireEnabled && qrTokenExpiry ? (
+                            {qrEnabled && qrExpireEnabled && qrTokenExpiry ? (
                                 <div className="text-sm font-bold text-red-500 mt-2 flex items-center justify-center">
                                     <Icons.Clock size={16} className="inline-block mr-1"/> QR Code เปลี่ยนใหม่ใน: {formatCountdown(qrCountdown)}
                                 </div>
@@ -1922,10 +1922,10 @@
                                         <div className="text-7xl md:text-[8rem] lg:text-[12rem] font-black leading-none tracking-normal drop-shadow-lg text-white">
                                             {currentDisplayServing.number}
                                         </div>
-                                        {/* แก้ไขตาม Request 1: เปลี่ยน px-12 py-2 เป็น px-6 py-3 และเพิ่ม max-w-full */}
-                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-6 py-3 rounded-full inline-block mx-auto max-w-full">
-                                            {/* แก้ไข 1.2: ลดขนาดชื่อลูกค้าและกำหนดให้เป็นแถวเดียว */}
-                                            <span className="text-3xl md:text-5xl font-bold block display-name-nowrap">คุณ {currentDisplayServing.name}</span>
+                                        {/* แก้ไขตาม Request 1: เปลี่ยน py-3 ให้เป็น py-4 เพื่อเพิ่ม Padding บนล่าง */}
+                                        <div className="mt-8 bg-white/20 backdrop-blur-md px-6 py-4 rounded-full inline-block mx-auto max-w-full">
+                                            {/* แก้ไข 1.2: ลบ display-name-nowrap เพื่อไม่ให้ตัดชื่อ */}
+                                            <span className="text-3xl md:text-5xl font-bold block whitespace-nowrap overflow-hidden text-ellipsis">คุณ {currentDisplayServing.name}</span>
                                         </div>
                                         <div className="mt-10 text-2xl md:text-4xl text-indigo-200 font-bold animate-pulse">เชิญเข้ารับบริการ</div>
                                     </div>
@@ -2018,7 +2018,7 @@
                                             />
                                             
                                             {/* FIXED: แสดงสถานะการหมดอายุ (เปลี่ยนสีเป็น red-600) */}
-                                            {qrExpireEnabled && qrTokenExpiry && (
+                                            {qrEnabled && qrExpireEnabled && qrTokenExpiry && (
                                                 <div className="text-[10px] text-red-600 mt-1 font-mono flex items-center justify-center">
                                                     <Icons.Clock size={10} className="inline-block mr-0.5"/> หมดอายุใน: {formatCountdown(qrCountdown)}
                                                 </div>
@@ -2442,7 +2442,7 @@
                                                 >
                                                     สร้าง QR Code ใหม่ทันที
                                                 </button>
-                                                {qrTokenExpiry && (
+                                                {qrEnabled && qrTokenExpiry && (
                                                      <div className="text-xs text-slate-500 text-center">
                                                          QR Code จะหมดอายุใน: {formatCountdown(qrCountdown)}
                                                      </div>
