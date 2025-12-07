@@ -519,6 +519,7 @@
             // Auto Recall States
             const [showAutoRecallModal, setShowAutoRecallModal] = useState(false);
             const [autoRecallConfig, setAutoRecallConfig] = useState({ count: 3, interval: 10 });
+            // FIX: แก้ไข Syntax Error: ต้องใช้ useState เพื่อให้เป็น State Hook
             const [autoRecallState, setAutoRecallState] = useState({ active: false, current: 0, total: 0, timer: null });
             
             // New State for QR Modal
@@ -751,17 +752,14 @@
                              return null;
                         }).filter(Boolean).join('\n');
 
-                        // Only update state if mapping has changed 
-                        setExternalLinkMapping(prev => {
-                            // Note: isManualSync check was previously misused here. It's meant to toast, not control logic.
-                            if (prev !== mappingString && isManualSync) {
+                            // Only update state if mapping has changed 
+                            setExternalLinkMapping(prev => {
                                 // Log silent update, but don't toast
                                 console.log("GAS mapping updated during manual sync.");
-                            }
-                            return mappingString;
-                        });
-                        
-                        setLastGasSyncTime(currentTime); // Update sync time
+                                return mappingString;
+                            });
+                            
+                            setLastGasSyncTime(currentTime); // Update sync time
 
                         // Only save to Firestore if it's a manual sync (to prevent excessive writes)
                         if (isManualSync && user && services) {
@@ -1604,7 +1602,7 @@
                 // --- แก้ไขตรรกะ QR Code Expiration ---
                 const finalQrExpireTime = parseInt(qrExpireTime) > 0 ? parseInt(qrExpireTime) : 0;
                 
-                // ถ้า QR expiration ถูกเปิดใช้งาน และไม่มีโทเค็น (หรือหมดอายุแบบ Infinite ถูกปิด แต่เวลามีน้อยกว่า 1)
+                // ถ้า QR expiration ถูกเปิดใช้งาน และมีกำหนดเวลา (finalQrExpireTime > 0)
                 if (qrEnabled && (qrExpireEnabled && finalQrExpireTime > 0)) {
                     // Force refresh token if needed only when active and finite
                     if (!qrToken || (qrTokenExpiry && Date.now() > qrTokenExpiry)) {
@@ -1670,7 +1668,16 @@
                     url.searchParams.delete('queue_token');
                 }
                 
-                window.open(url.toString(), '_blank'); 
+                // *** FIX: Use qrCodeData (which is the kioskUrl with token/mode) for the link
+                const kioskUrlWithToken = new URL(window.location.href);
+                kioskUrlWithToken.searchParams.set('mode', 'kiosk'); 
+                if(qrEnabled && qrToken) {
+                     kioskUrlWithToken.searchParams.set('queue_token', qrToken);
+                } else {
+                    kioskUrlWithToken.searchParams.delete('queue_token');
+                }
+                
+                window.open(kioskUrlWithToken.toString(), '_blank'); 
             };
 
             const openQROnlyLink = () => { 
@@ -1696,8 +1703,9 @@
             if (showHistory) {
                 // 1. Filter by status
                 let filteredQueues = queues.filter(q => {
-                    if (q.status === 'waiting' || q.status === 'serving') return false; // Only show completed and cancelled
-                    if (showHistory === 'all') return true;
+                    // *** FIX: Include 'waiting' in 'all' status for correct counting ***
+                    if (showHistory === 'all') return true; 
+                    if (q.status === 'waiting' || q.status === 'serving') return false; // Only show completed and cancelled for specific history views
                     return q.status === showHistory;
                 });
 
@@ -2159,7 +2167,7 @@
                 .slice(0, 7); 
             
             // Note: qrCodeData generation is now global (line ~1088)
-            const isQrExpirationActive = qrExpireEnabled && qrExpireTime > 0;
+            const isQrExpirationActive = qrEnabled && qrExpireEnabled && qrExpireTime > 0; // CORRECTED Logic check
 
             if (viewMode === 'display') {
                 
@@ -2333,7 +2341,7 @@
                                             />
                                             
                                             {/* NEW: แสดงสถานะการหมดอายุ (ตามโจทย์: แสดงเฉพาะเมื่อเปิดใช้งานและมีค่า > 0) */}
-                                            {qrEnabled && isQrExpirationActive && (
+                                            {isQrExpirationActive && (
                                                 <div className="text-[10px] text-red-600 mt-1 font-mono font-bold flex items-center justify-center animate-pulse">
                                                     <Icons.Clock size={10} className="inline-block mr-0.5"/> หมดอายุใน: {formatCountdown(qrCountdown)}
                                                 </div>
@@ -2448,8 +2456,9 @@
                             </div>
                             <div className="flex gap-1 sm:gap-2 flex-shrink-0">
                                 <button onClick={() => setShowScanner(true)} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-full flex-shrink-0 transition-colors"><Icons.Scan size={20} className="sm:w-6 sm:h-6"/></button>
-                                <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full flex-shrink-0"><Icons.Settings size={20} className="sm:w-6 sm:h-6"/></button>
                                 <div className="relative group">
+                                    <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full flex-shrink-0"><Icons.Settings size={20} className="sm:w-6 sm:h-6"/></button>
+                                    {/* <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full flex-shrink-0"><Icons.Settings size={20} className="sm:w-6 sm:h-6"/></button> */}
                                     <button onClick={openKioskLink} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors"><Icons.Link size={16}/> <span className="hidden sm:inline">Kiosk Link</span></button>
                                     <button 
                                         onClick={openQROnlyLink} 
@@ -2547,6 +2556,7 @@
                                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-4">ภาพรวมวันนี้ (กดเพื่อดูประวัติ)</h3>
                                     <div className="space-y-3">
                                         {/* UPDATED: Add setHistorySort('booked_latest') as default */}
+                                        {/* FIX: Change filtering for 'all' to include 'waiting' and 'serving' queues */}
                                         <button onClick={() => { setShowHistory('all'); setHistorySort('booked_latest'); }} className="w-full flex justify-between items-center p-4 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors">
                                             <span className="text-slate-600 font-medium">ทั้งหมด</span>
                                             <span className="text-2xl font-black text-slate-800">{queues.length}</span>
@@ -2555,6 +2565,9 @@
                                         <button onClick={() => { setShowHistory('completed'); setHistorySort('completed_latest'); }} className="w-full flex justify-between items-center p-4 bg-green-50 hover:bg-green-100 rounded-xl transition-colors text-green-700"><span className="font-medium flex items-center gap-2"><Icons.History size={16}/> เสร็จสิ้น</span><span className="text-2xl font-black">{queues.filter(q => q.status==='completed').length}</span></button>
                                         {/* UPDATED: Add setHistorySort('booked_latest') as default */}
                                         <button onClick={() => { setShowHistory('cancelled'); setHistorySort('booked_latest'); }} className="w-full flex justify-between items-center p-4 bg-red-50 hover:bg-red-100 rounded-xl transition-colors text-red-700"><span className="font-medium flex items-center gap-2"><Icons.History size={16}/> ยกเลิก</span><span className="text-2xl font-black">{queues.filter(q => q.status==='cancelled').length}</span></button>
+                                        
+                                        {/* NEW: Add Waiting button for clarity (using amber color as per existing styling for waiting) */}
+                                        <button onClick={() => { setShowHistory('waiting'); setHistorySort('booked_latest'); }} className="w-full flex justify-between items-center p-4 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors text-amber-700"><span className="font-medium flex items-center gap-2"><Icons.Clock size={16}/> กำลังรอ</span><span className="text-2xl font-black">{queues.filter(q => q.status==='waiting').length}</span></button>
                                     </div>
                                 </div>
                             </div>
@@ -3037,7 +3050,7 @@
                                         <div className="flex items-center gap-2">
                                             <h2 className="font-bold text-xl flex items-center gap-2">
                                                 <Icons.History/> 
-                                                {showHistory === 'all' ? 'ประวัติทั้งหมด' : (showHistory === 'completed' ? 'รายการเสร็จสิ้น' : 'รายการยกเลิก')}
+                                                {showHistory === 'all' ? 'ประวัติทั้งหมด' : (showHistory === 'completed' ? 'รายการเสร็จสิ้น' : (showHistory === 'cancelled' ? 'รายการยกเลิก' : 'กำลังรอ'))}
                                             </h2>
                                         </div>
                                         {/* "จำนวนรายการ" */}
