@@ -1735,7 +1735,7 @@
                         {/* FIXED: เพิ่ม bg-white คลุมทั้งบล็อก QR และข้อความกำกับ */}
                         <div className="bg-white p-6 rounded-3xl shadow-xl border border-white/20 text-center animate-fade-in max-w-sm w-full">
                             
-                            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center justify-center gap-2">
+                            <h2 className="font-bold text-xl text-slate-800 mb-4 flex items-center justify-center gap-2">
                                 <Icons.QrCode size={24} className="text-indigo-600"/> สแกนเพื่อรับบัตรคิว
                             </h2>
 
@@ -2262,7 +2262,10 @@
                                                     {/* แก้ไข 1.4: ลดขนาดชื่อลูกค้าที่รอคิว */}
                                                     <div className="text-base font-medium text-slate-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[70%]">{q.name}</div>
                                                     {/* FIXED: แสดงวันที่และเวลา */}
-                                                    <span className="text-xs text-indigo-200 block font-medium flex-shrink-0">{formatDateTime(q.createdAt)}</span>
+                                                    <span className="text-xs text-indigo-200 block font-medium flex-shrink-0">
+                                                        {/* FIXED: แสดงข้อความ "คิวถัดไป" สำหรับคิวแรกในรายการรอ */}
+                                                        {index === 0 ? "คิวถัดไป (กำลังจะเรียก)" : `${index + 1} คิวถัดไป`}
+                                                    </span>
                                                 </div>
                                                 
                                                 {/* Line 3: Note (Full Width with Divider) */}
