@@ -601,7 +601,15 @@
                 
                 // --- แก้ไขตรรกะ QR Code Expiration ---
                 // ปัญหาที่ 5: Treat 0 or invalid/empty as 0 (Infinite)
-                const finalExpiryMinutes = parseInt(expiryMinutes) > 0 ? parseInt(expiryMinutes) : 0;
+                const raw = expiryMinutes;
+                let finalExpiryMinutes;
+                if (raw === "" || raw === null) {
+                    finalExpiryMinutes = 0;
+                } else if (Number(raw) === 0) {
+                    finalExpiryMinutes = 0;
+                } else {
+                    finalExpiryMinutes = parseInt(raw, 10);
+                }
                 
                 let tokenExpiry = null;
                 // ถ้าค่ามากกว่า 0 (หรือถูกเปิดใช้งาน) -> กำหนดเวลาหมดอายุ
@@ -1010,8 +1018,16 @@
                         if (data.qrExpireEnabled !== undefined) setQrExpireEnabled(data.qrExpireEnabled);
                         // ปัญหาที่ 5: Logic รองรับ 0/ว่าง
                         if (data.qrExpireTime !== undefined) {
-                            const time = parseInt(data.qrExpireTime);
-                            setQrExpireTime(isNaN(time) ? 0 : time); 
+                            const raw = data.qrExpireTime;
+                            let finalQrExpireTime;
+                            if (raw === "" || raw === null) {
+                                finalQrExpireTime = 0;
+                            } else if (Number(raw) === 0) {
+                                finalQrExpireTime = 0;
+                            } else {
+                                finalQrExpireTime = parseInt(raw, 10);
+                            }
+                            setQrExpireTime(isNaN(finalQrExpireTime) ? 0 : finalQrExpireTime); 
                         }
                         if (data.qrToken) setQrToken(data.qrToken);
                         if (data.qrTokenExpiry !== undefined) setQrTokenExpiry(data.qrTokenExpiry);
@@ -1199,7 +1215,7 @@
                 // Run once on mount to check if token needs refresh
                 updateToken();
                 // ปัญหาที่ 2: เรียกใช้ startCountdown เมื่อ dependency เปลี่ยน
-                if (qrEnabled && qrExpireTime > 0) {
+                if (qrEnabled && Number(qrExpireTime) > 0) {
                     // Clear existing interval before starting a new one
                     if (interval) clearInterval(interval);
                     startCountdown();
@@ -1642,7 +1658,15 @@
                 
                 // --- แก้ไขตรรกะ QR Code Expiration ---
                 // ปัญหาที่ 5: Ensure 0 or invalid/empty is treated as 0 (Infinite)
-                const finalQrExpireTime = parseInt(qrExpireTime) > 0 ? parseInt(qrExpireTime) : 0;
+                const raw = qrExpireTime;
+                let finalQrExpireTime;
+                if (raw === "" || raw === null) {
+                    finalQrExpireTime = 0;
+                } else if (Number(raw) === 0) {
+                    finalQrExpireTime = 0;
+                } else {
+                    finalQrExpireTime = parseInt(raw, 10);
+                }
                 
                 // ถ้า QR expiration ถูกเปิดใช้งาน และมีกำหนดเวลา (finalQrExpireTime > 0)
                 if (qrEnabled && (qrExpireEnabled && finalQrExpireTime > 0)) {
@@ -1701,32 +1725,29 @@
 
             // ปัญหาที่ 1: แก้ไข openKioskLink ให้เพิ่ม queue_token เมื่อ qrEnabled = true
             const openKioskLink = () => { 
-                const url = new URL(window.location.href); 
-                url.searchParams.set('mode', 'kiosk'); 
-                
-                // ปัญหาที่ 1: เพิ่ม token ถ้า QR Enabled และมี token
-                if(qrEnabled && qrToken) {
-                    url.searchParams.set('queue_token', qrToken);
+                const url = new URL(window.location.href);
+                url.search = "";
+                url.searchParams.set("mode", "kiosk");
+                if (qrEnabled && qrToken) {
+                    url.searchParams.set("queue_token", qrToken);
                 } else {
-                    url.searchParams.delete('queue_token');
+                    url.searchParams.delete("queue_token");
                 }
-                
-                // *** FIX: Use url.toString()
-                window.open(url.toString(), '_blank'); 
+                const finalKioskURL = url.toString();
+                window.open(finalKioskURL, '_blank'); 
             };
 
             const openQROnlyLink = () => { 
-                const url = new URL(window.location.href); 
-                url.searchParams.set('mode', 'qr-only'); 
-                
-                // ปัญหาที่ 1: เพิ่ม token ถ้า QR Enabled และมี token
-                if(qrEnabled && qrToken) {
-                    url.searchParams.set('queue_token', qrToken);
+                const url = new URL(window.location.href);
+                url.search = "";
+                url.searchParams.set("mode", "qr-only");
+                if (qrEnabled && qrToken) {
+                    url.searchParams.set("queue_token", qrToken);
                 } else {
-                    url.searchParams.delete('queue_token');
+                    url.searchParams.delete("queue_token");
                 }
-                
-                window.open(url.toString(), '_blank'); 
+                const finalKioskURL = url.toString();
+                window.open(finalKioskURL, '_blank'); 
             };
 
             const waitingQueues = queues.filter(q => q.status === 'waiting');
@@ -1831,9 +1852,9 @@
                                 />
                                 
                                 {/* ปัญหาที่ 2: Countdown ใต้ QR Code (Display Mode / QR Only) */}
-                                {isQrExpirationActiveAndFinite && (
-                                    <div className="text-sm font-bold text-red-600 mt-3 flex items-center justify-center animate-pulse">
-                                        <Icons.Clock size={16} className="inline-block mr-1"/> QR Code เปลี่ยนใหม่ใน: {countdown}
+                                {qrEnabled && Number(qrExpireTime) > 0 && (
+                                    <div className="text-center mt-3 text-lg font-semibold text-red-600">
+                                        เหลือเวลา {countdown || formatCountdown(qrCountdown)}
                                     </div>
                                 )}
                             </div>
@@ -2061,10 +2082,14 @@
                         {showMyHistory && (
                             <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
                                  <div className="bg-white rounded-2xl w-full max-w-sm relative shadow-2xl flex flex-col max-h-[80vh]">
-                                     <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                                         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Icons.History size={20}/> ประวัติการจองของฉัน</h3>
-                                         {/* Note: Customer history is ONLY stored in localStorage, which is cleared on global clear */}
-                                         <button onClick={() => setShowMyHistory(false)} className="text-slate-400 hover:text-slate-600"><Icons.Cross size={24}/></button>
+                                     <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                         <div className="flex flex-col flex-1 min-w-0">
+                                             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Icons.History size={20}/> ประวัติการจองของฉัน</h3>
+                                             {/* Note: Customer history is ONLY stored in localStorage, which is cleared on global clear */}
+                                         </div>
+                                         <div className="flex gap-2 items-center justify-end flex-nowrap flex-shrink-0">
+                                             <button onClick={() => setShowMyHistory(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors flex-shrink-0"><Icons.Cross size={24}/></button>
+                                         </div>
                                      </div>
                                      <div className="p-4 overflow-y-auto flex-1">
                                          {/* START FIX: Filter history to show only completed or cancelled queues */}
@@ -2389,9 +2414,9 @@
                                             />
                                             
                                             {/* ปัญหาที่ 2: Countdown ใต้ QR Code (Display Mode / QR Only) */}
-                                            {isQrExpirationActiveAndFinite && (
-                                                <div className="text-[10px] text-red-600 mt-1 font-mono font-bold flex items-center justify-center animate-pulse">
-                                                    <Icons.Clock size={10} className="inline-block mr-0.5"/> หมดอายุใน: {countdown}
+                                            {qrEnabled && Number(qrExpireTime) > 0 && (
+                                                <div className="text-center mt-3 text-lg font-semibold text-red-600">
+                                                    เหลือเวลา {countdown || formatCountdown(qrCountdown)}
                                                 </div>
                                             )}
                                             {/* END NEW QR CODE TIMER */}
@@ -2503,19 +2528,11 @@
                                 <button onClick={() => setViewMode('display')} className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold ${viewMode==='display'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>Display</button>
                             </div>
                             {/* ปัญหาที่ 4: แถบด้านบนของหน้า Admin */}
-                            <div className="flex gap-1 sm:gap-2 flex-shrink-0 flex-nowrap overflow-x-auto no-scrollbar">
+                            <div className="flex items-center gap-2 flex-nowrap overflow-x-auto no-scrollbar">
                                 <button onClick={() => setShowScanner(true)} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-full flex-shrink-0 transition-colors" title="Scanner"><Icons.Scan size={20} className="sm:w-6 sm:h-6 flex-shrink-0"/></button>
                                 <button onClick={() => setViewMode('qr-only')} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-full flex-shrink-0 transition-colors" title="QR Only Link"><Icons.QrCode size={20} className="sm:w-6 sm:h-6 flex-shrink-0"/></button>
-                                <div className="relative group flex-shrink-0 flex items-center gap-1 sm:gap-2">
-                                    <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full flex-shrink-0" title="Settings"><Icons.Settings size={20} className="sm:w-6 sm:h-6 flex-shrink-0"/></button>
-                                    <button onClick={openKioskLink} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors flex-shrink-0"><Icons.Link size={16} className="flex-shrink-0"/> <span className="hidden sm:inline flex-shrink-0">Kiosk Link</span></button>
-                                    {/* <button 
-                                        onClick={openQROnlyLink} 
-                                        className="absolute top-full mt-1 right-0 w-44 bg-slate-700 text-white text-xs p-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50"
-                                    >
-                                        ลิงค์ QR Code สำหรับฝัง
-                                    </button> */}
-                                </div>
+                                <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full flex-shrink-0" title="Settings"><Icons.Settings size={20} className="sm:w-6 sm:h-6 flex-shrink-0"/></button>
+                                <button onClick={openKioskLink} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors flex-shrink-0"><Icons.Link size={16} className="flex-shrink-0"/> <span className="hidden sm:inline flex-shrink-0">Kiosk Link</span></button>
                             </div>
                         </div>
                     </div>
@@ -3095,9 +3112,7 @@
                             <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in h-[80vh] flex flex-col">
                                 
                                 {/* ปัญหาที่ 3: แก้ไข div สำหรับปุ่ม Clear และ Close */}
-                                <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-start flex-shrink-0">
-                                    
-                                    {/* Left Side: Title + Item Count */}
+                                <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                                     <div className="flex flex-col flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <h2 className="font-bold text-xl flex items-center gap-2">
@@ -3112,7 +3127,7 @@
                                     
                                     {/* Right Side Buttons: Clear and Close - แก้ไขให้ใช้ flex-nowrap และ flex-shrink-0 */}
                                     {/* ใช้ flex-row และ justify-end เพื่อจัดเรียงแนวนอนชิดขวาเสมอ */}
-                                    <div className="flex gap-2 items-center justify-end flex-shrink-0 flex-nowrap w-full sm:w-auto mt-2 sm:mt-0">
+                                    <div className="flex gap-2 items-center justify-end flex-nowrap flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
                                         {/* Clear Button */}
                                         {showHistory === 'all' && (
                                             <button onClick={() => setShowClearPopup(true)} className="text-xs text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors font-bold flex-shrink-0">
